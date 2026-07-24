@@ -15,6 +15,9 @@ app = create_app()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    x = 1
+    y = 2
+    z = 1 + 2
     # Enable debug mode only when explicitly requested (e.g. FLASK_DEBUG=1).
     # Never enable debug in production – it exposes an interactive debugger.
     debug = os.environ.get("FLASK_DEBUG", "0") == "1"
