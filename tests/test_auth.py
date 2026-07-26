@@ -1,0 +1,77 @@
+def _register(client, username="alice", password="s3cr3t12"):
+    return client.post(
+        "/auth/register",
+        json={"username": username, "email": f"{username}@example.com", "password": password, "preferences": ["beach"]},
+    )
+
+
+def test_register_success(client):
+    resp = _register(client)
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["username"] == "alice"
+    assert "hashed_password" not in body  # never leak the hash
+
+
+def test_register_duplicate_username_rejected(client):
+    _register(client)
+    resp = _register(client)
+    assert resp.status_code == 409
+
+
+def test_login_wrong_password_rejected(client):
+    _register(client)
+    resp = client.post("/auth/login", json={"username": "alice", "password": "wrong-pass1"})
+    assert resp.status_code == 401
+
+
+def test_login_success_returns_access_token_and_refresh_cookie(client):
+    _register(client)
+    resp = client.post("/auth/login", json={"username": "alice", "password": "s3cr3t12"})
+    assert resp.status_code == 200
+    assert "access_token" in resp.json()
+    assert "gt_refresh_token" in resp.cookies
+
+
+def test_protected_route_requires_token(client):
+    resp = client.get("/users/me")
+    assert resp.status_code == 401
+
+
+def test_protected_route_with_valid_token(client):
+    _register(client)
+    login_resp = client.post("/auth/login", json={"username": "alice", "password": "s3cr3t12"})
+    token = login_resp.json()["access_token"]
+    resp = client.get("/users/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    assert resp.json()["username"] == "alice"
+
+
+def test_mfa_full_enrollment_and_login_flow(client):
+    import pyotp
+
+    _register(client)
+    login_resp = client.post("/auth/login", json={"username": "alice", "password": "s3cr3t12"})
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    setup_resp = client.post("/auth/mfa/setup", headers=headers)
+    assert setup_resp.status_code == 200
+    secret = setup_resp.json()["secret"]
+
+    code = pyotp.TOTP(secret).now()
+    confirm_resp = client.post("/auth/mfa/confirm", json={"code": code}, headers=headers)
+    assert confirm_resp.status_code == 200
+
+    # Login without MFA code now returns a challenge, not tokens.
+    challenge_resp = client.post("/auth/login", json={"username": "alice", "password": "s3cr3t12"})
+    assert challenge_resp.json().get("mfa_required") is True
+
+    # Login with the correct TOTP code succeeds.
+    fresh_code = pyotp.TOTP(secret).now()
+    full_login = client.post(
+        "/auth/login",
+        json={"username": "alice", "password": "s3cr3t12", "mfa_code": fresh_code},
+    )
+    assert full_login.status_code == 200
+    assert "access_token" in full_login.json()

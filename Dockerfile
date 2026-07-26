@@ -1,20 +1,21 @@
-# Use an official lightweight Python runtime as the base image
-FROM python:3.9-slim
+FROM python:3.11-slim
 
-# Set a working directory inside the container
 WORKDIR /globetrotter
 
-# Copy dependency file first to leverage Docker layer caching
+# Install only production dependencies — pytest/locust never ship in this image.
 COPY requirements.txt .
-
-# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application source code
-COPY . .
+COPY app/ ./app/
+COPY data/destinations.json ./data/destinations.json
 
-# Expose the port the app runs on
-EXPOSE 5000
+# Run as a non-root user
+RUN useradd --create-home appuser
+USER appuser
 
-# Run the application
-CMD ["python", "app/main.py"]
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

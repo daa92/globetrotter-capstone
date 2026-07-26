@@ -1,32 +1,45 @@
 """
 app/__init__.py
 
-Flask application factory.
+FastAPI application factory. Kept small on purpose: this file's only job
+is wiring — middleware, routers, and the health check. Business logic
+always lives in routers/, never here.
 """
-import os
-from flask import Flask
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import settings
+from app.routers import auth, destinations, feedback, itineraries, places, recommendations, users
 
 
-def create_app():
-    """Create and configure the Flask application."""
-    app = Flask(__name__)
-
-    # Secret key used for JWT signing.  Set the SECRET_KEY environment variable
-    # in production.  The fallback is intentionally weak and must never be used
-    # outside of local development.
-    app.config["SECRET_KEY"] = os.environ.get(
-        "SECRET_KEY", "globetrotter-secret-change-in-prod"
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title=settings.APP_NAME,
+        description="GT (GlobeTrotter) — discover and plan trips across Cameroon.",
+        version="0.1.0-phase1",
+        docs_url="/docs",
+        redoc_url="/redoc",
     )
 
-    # Register all route blueprints
-    from app.auth import auth_bp
-    from app.destinations import destinations_bp
-    from app.recommendations import recommendations_bp
-    from app.itineraries import itineraries_bp
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=True,  # required so the refresh cookie is sent cross-origin
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(destinations_bp)
-    app.register_blueprint(recommendations_bp)
-    app.register_blueprint(itineraries_bp)
+    app.include_router(auth.router)
+    app.include_router(users.router)
+    app.include_router(destinations.router)
+    app.include_router(recommendations.router)
+    app.include_router(itineraries.router)
+    app.include_router(places.router)
+    app.include_router(feedback.router)
+
+    @app.get("/health", tags=["meta"])
+    def health():
+        """Liveness/readiness probe. Kubernetes will use this from Phase 3 onward."""
+        return {"status": "ok", "env": settings.ENV}
 
     return app

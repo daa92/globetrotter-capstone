@@ -1,34 +1,32 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
+*.pyc
 .venv/
-ENV/
-*.egg
+venv/
 *.egg-info/
-dist/
-build/
-.eggs/
-.pytest_cache/
-.mypy_cache/
-*.pyo
+cli/.venv/
+cli/build/
+cli/*.egg-info/
 
-# Environment variables
+# Env / secrets
 .env
-.env.*
+*.env.local
 
-# Docker
-.dockerignore
+# Runtime data (regenerated at runtime, must never be committed with real user data)
+data/users.json
+data/itineraries.json
+data/places.json
+data/feedback.json
 
-# Data files (populated at runtime; keep only .gitkeep)
-data/*.json
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
 
-# IDE / editor
+# OS / editor
+.DS_Store
 .vscode/
 .idea/
-*.swp
-*.swo
+
+# Docker
+*.log

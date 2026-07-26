@@ -1,13 +1,34 @@
 version: "3.9"
 
 services:
-  globetrotter:
-    build: .
-    container_name: globetrotter_app
+  # Main API, hot-reloading for local development.
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: globetrotter_api
     ports:
-      - "5000:5000"
-    # Mount local code so changes are reflected without rebuilding the image
+      - "8000:8000"
     volumes:
       - .:/globetrotter
+    env_file:
+      - .env
     environment:
-      - PORT=5000
+      - PORT=8000
+
+  # Load/robustness simulation runner — NOT started by default.
+  # Run explicitly with: docker compose --profile simulation up locust
+  locust:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: globetrotter_locust
+    profiles: ["simulation"]
+    depends_on:
+      - api
+    working_dir: /globetrotter
+    command: locust -f testing/simulation/locustfile.py --host http://api:8000
+    ports:
+      - "8089:8089"
+    volumes:
+      - .:/globetrotter

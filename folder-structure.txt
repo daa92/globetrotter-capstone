@@ -1,0 +1,108 @@
+globetrotter/
+├── app/                        ← all backend source code lives here
+│   ├── __init__.py             ← the "app factory": creates the FastAPI instance,
+│   │                             registers CORS middleware, wires in every router,
+│   │                             defines /health. This is the ONE place that
+│   │                             assembles the whole app — nothing else should.
+│   ├── main.py                 ← the entry point. Literally just imports the app
+│   │                             from __init__.py and hands it to uvicorn. This is
+│   │                             what "uvicorn app.main:app" points at.
+│   ├── config.py                ← reads environment variables (.env) into a typed
+│   │                             Settings object — SECRET_KEY, token lifetimes,
+│   │                             cookie flags, etc. Nothing else in the app should
+│   │                             read os.environ directly; it all goes through here.
+│   ├── security.py              ← every cryptographic operation: password
+│   │                             hashing/verification (bcrypt), JWT creation/
+│   │                             decoding, MFA secret generation/verification
+│   │                             (TOTP). Isolated so it's the one file you'd
+│   │                             audit for crypto correctness.
+│   ├── storage.py               ← the ENTIRE JSON-file read/write layer. Every
+│   │                             other file in the app touches data through
+│   │                             these functions, never by opening files
+│   │                             directly. This isolation is deliberate: when
+│   │                             Phase 2 swaps JSON for PostgreSQL, only this
+│   │                             file needs to change.
+│   ├── schemas.py               ← Pydantic models: the exact shape of every
+│   │                             request body and response. FastAPI uses these
+│   │                             to auto-validate input and auto-generate the
+│   │                             /docs page — a bad request (wrong type, missing
+│   │                             field) gets rejected before your code even runs.
+│   ├── dependencies.py          ← get_current_user / get_current_admin — the
+│   │                             functions that check "is this request carrying
+│   │                             a valid JWT?" Any route that needs auth just
+│   │                             adds Depends(get_current_user) as a parameter.
+│   └── routers/                 ← one file per feature area, each a FastAPI
+│       ├── auth.py                APIRouter. Splitting by feature (not by
+│       ├── users.py               HTTP verb or by file size) keeps each file
+│       ├── destinations.py        readable and independently testable — and
+│       ├── recommendations.py     maps directly onto the microservices you'll
+│       ├── itineraries.py         split into in Phase 2 (auth+users → User
+│       ├── places.py              Service, itineraries → Itinerary Service,
+│       └── feedback.py            recommendations → Recommendation Service).
+│
+├── data/                        ← the Phase 1 "database" — plain JSON files
+│   ├── destinations.json          This one IS committed to git — it's seed
+│   │                              data (the Cameroon catalogue), not user data.
+│   ├── users.json                These four are gitignored — they're runtime
+│   ├── itineraries.json          state generated while the app runs. If you
+│   ├── places.json               look, they won't even appear in `git status`
+│   └── feedback.json             because .gitignore excludes them by name.
+│
+├── tests/                       ← automated tests, run with `pytest tests/ -v`
+│   ├── conftest.py                Shared test setup: builds a fresh FastAPI
+│   │                              app pointed at a temporary, throwaway data
+│   │                              folder for every single test, so tests never
+│   │                              touch or corrupt your real data/*.json files.
+│   ├── test_auth.py                Tests registration, login, JWT, and the
+│   │                                full MFA enroll→confirm→login-with-code flow.
+│   └── test_destinations_and_recommendations.py
+│                                    Tests search filtering and that
+│                                    recommendations actually match preferences.
+│
+├── testing/simulation/          ← the robustness/load tools you asked for.
+│   ├── locustfile.py               Simulates many concurrent fake users
+│   │                                hitting the API realistically (register,
+│   │                                search, get recommendations, plan trips)
+│   │                                so you can watch latency/error rates
+│   │                                under load.
+│   ├── chaos_probe.py               A quick script that fires malformed/
+│   │                                oversized/unauthenticated requests and
+│   │                                reports how the API responded — a sanity
+│   │                                check that validation is actually working.
+│   └── README.md                    Explains how to run both, and — importantly
+│                                     — how it's guaranteed these never end up
+│                                     in production (see Dockerfile/.dockerignore below).
+│
+├── Dockerfile                   ← the PRODUCTION image. Only copies app/ and
+│                                   the seed destinations.json. No tests, no
+│                                   simulation code, no dev dependencies. Runs
+│                                   as a non-root user. This is what you'd
+│                                   actually deploy.
+├── Dockerfile.dev                ← the DEV image. Copies everything, installs
+│                                   requirements-dev.txt (adds pytest/locust/
+│                                   httpx), runs uvicorn with --reload so code
+│                                   changes reflect instantly.
+├── docker-compose.yml            ← orchestrates the dev container (`api`
+│                                   service), plus an optional `locust` service
+│                                   that only starts if you explicitly ask for
+│                                   the "simulation" profile — it never runs by
+│                                   accident.
+├── .dockerignore                ← tells Docker's build process to skip tests/,
+│                                   testing/, .env, .git, etc. even if someone
+│                                   later fat-fingers the Dockerfile — belt and
+│                                   suspenders alongside Dockerfile's explicit
+│                                   COPY list.
+├── requirements.txt              ← exact production dependencies (pinned
+│                                   versions — reproducibility again).
+├── requirements-dev.txt          ← production deps + pytest, httpx, locust.
+│                                   `-r requirements.txt` at the top means it
+│                                   installs everything from that file too.
+├── .env.example                  ← a template for your real .env (which is
+│                                   gitignored). Committing this — but never
+│                                   the real .env — means anyone cloning the
+│                                   repo knows exactly which variables to set,
+│                                   without your actual secrets ever touching git.
+├── .gitignore                     ← what git should never track: venv folder,
+│                                   .env, runtime data files, caches.
+├── LICENSE                       ← MIT, carried over from your lecturer's fork.
+└── README.md                     ← setup instructions, API table, roadmap.

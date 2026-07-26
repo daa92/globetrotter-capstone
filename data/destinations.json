@@ -1,0 +1,122 @@
+[
+  {
+    "id": "limbe-botanic-beach",
+    "name": "Limbe Botanic Garden & Black Sand Beach",
+    "region": "Southwest",
+    "tags": ["beach", "nature", "wildlife", "relaxation"],
+    "description": "A lush botanical garden founded in 1892 sitting right above Limbe's volcanic black-sand coastline, with views of Mount Cameroon rising behind the Atlantic.",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Limbe_Botanic_Garden.jpg/640px-Limbe_Botanic_Garden.jpg",
+    "latitude": 4.0163,
+    "longitude": 9.2136,
+    "avg_cost_fcfa": 5000,
+    "submitted_by": null
+  },
+  {
+    "id": "mount-cameroon",
+    "name": "Mount Cameroon",
+    "region": "Southwest",
+    "tags": ["hiking", "adventure", "nature", "mountain"],
+    "description": "West Africa's tallest peak and an active volcano, offering a multi-day trek through rainforest, savanna, and volcanic scree to a 4,040m summit.",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Mount_Cameroon.jpg/640px-Mount_Cameroon.jpg",
+    "latitude": 4.2026,
+    "longitude": 9.1704,
+    "avg_cost_fcfa": 60000,
+    "submitted_by": null
+  },
+  {
+    "id": "waza-national-park",
+    "name": "Waza National Park",
+    "region": "Far North",
+    "tags": ["wildlife", "safari", "nature", "photography"],
+    "description": "A UNESCO Biosphere Reserve in the Sahelian north, home to elephants, giraffes, lions, and hundreds of bird species across open savanna.",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Waza_National_Park_Elephants.jpg/640px-Waza_National_Park_Elephants.jpg",
+    "latitude": 11.4167,
+    "longitude": 14.5833,
+    "avg_cost_fcfa": 15000,
+    "submitted_by": null
+  },
+  {
+    "id": "rhumsiki-peaks",
+    "name": "Rhumsiki (Mandara Mountains)",
+    "region": "Far North",
+    "tags": ["hiking", "culture", "scenery", "photography"],
+    "description": "A village in the volcanic Mandara Mountains famous for its dramatic rock spires, Kapsiki culture, and traditional crab-divination ceremonies.",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Rhumsiki_peak.jpg/640px-Rhumsiki_peak.jpg",
+    "latitude": 10.9667,
+    "longitude": 13.7333,
+    "avg_cost_fcfa": 10000,
+    "submitted_by": null
+  },
+  {
+    "id": "foumban-royal-palace",
+    "name": "Foumban Royal Palace & Museum",
+    "region": "West",
+    "tags": ["culture", "history", "art", "museum"],
+    "description": "Seat of the Bamoun Kingdom since the 14th century, with a royal museum housing masks, thrones, and artifacts spanning centuries of Bamoun history.",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Palais_royal_de_Foumban.jpg/640px-Palais_royal_de_Foumban.jpg",
+    "latitude": 5.7263,
+    "longitude": 10.9000,
+    "avg_cost_fcfa": 3000,
+    "submitted_by": null
+  },
+  {
+    "id": "kribi-beach",
+    "name": "Kribi Beach & Lobe Waterfalls",
+    "region": "South",
+    "tags": ["beach", "relaxation", "nature", "waterfall"],
+    "description": "White-sand Atlantic beaches meet the rare sight of the Lobe Falls cascading directly into the ocean, just south of Kribi town.",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Chutes_de_la_Lobe.jpg/640px-Chutes_de_la_Lobe.jpg",
+    "latitude": 2.9500,
+    "longitude": 9.9167,
+    "avg_cost_fcfa": 8000,
+    "submitted_by": null
+  },
+  {
+    "id": "dja-faunal-reserve",
+    "name": "Dja Faunal Reserve",
+    "region": "East",
+    "tags": ["wildlife", "nature", "rainforest", "eco-tourism"],
+    "description": "A UNESCO World Heritage rainforest reserve, one of the largest and best-protected in Africa, home to gorillas, chimpanzees, and forest elephants.",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Dja_Reserve_rainforest.jpg/640px-Dja_Reserve_rainforest.jpg",
+    "latitude": 3.2500,
+    "longitude": 12.9167,
+    "avg_cost_fcfa": 25000,
+    "submitted_by": null
+  },
+  {
+    "id": "yaounde-city",
+    "name": "Yaoundé — Seven Hills Capital",
+    "region": "Centre",
+    "tags": ["city", "culture", "nightlife", "history"],
+    "description": "Cameroon's hilltop capital, blending government architecture, the National Museum, vibrant markets, and a growing food and nightlife scene.",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Yaounde_skyline.jpg/640px-Yaounde_skyline.jpg",
+    "latitude": 3.8480,
+    "longitude": 11.5021,
+    "avg_cost_fcfa": 4000,
+    "submitted_by": null
+  },
+  {
+    "id": "douala-city",
+    "name": "Douala — Economic Capital",
+    "region": "Littoral",
+    "tags": ["city", "nightlife", "food", "shopping"],
+    "description": "Cameroon's largest city and main port, known for its energetic street food scene, art galleries, and the lively Akwa nightlife district.",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Douala_port.jpg/640px-Douala_port.jpg",
+    "latitude": 4.0511,
+    "longitude": 9.7679,
+    "avg_cost_fcfa": 4000,
+    "submitted_by": null
+  },
+  {
+    "id": "bafut-palace",
+    "name": "Bafut Palace",
+    "region": "Northwest",
+    "tags": ["culture", "history", "art"],
+    "description": "The traditional seat of the Fon of Bafut, a UNESCO-tentative-list palace complex of carved wooden buildings reflecting Grassfields kingdom heritage.",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Bafut_Palace.jpg/640px-Bafut_Palace.jpg",
+    "latitude": 6.0833,
+    "longitude": 10.1000,
+    "avg_cost_fcfa": 3000,
+    "submitted_by": null
+  }
+]
