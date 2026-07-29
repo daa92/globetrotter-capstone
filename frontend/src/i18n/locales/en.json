@@ -1,0 +1,20 @@
+{
+  "nav": {
+    "home": "Home",
+    "search": "Explore",
+    "recommendations": "For you",
+    "itineraries": "My trips",
+    "howToUse": "How to use",
+    "login": "Log in",
+    "register": "Sign up",
+    "profile": "Profile",
+    "logout": "Log out"
+  },
+  "home": {
+    "tagline": "Discover Cameroon, one place at a time.",
+    "cta": "Start exploring"
+  },
+  "footer": {
+    "rights": "All rights reserved."
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "search": "Explorer",
+    "recommendations": "Pour vous",
+    "itineraries": "Mes voyages",
+    "howToUse": "Mode d'emploi",
+    "login": "Connexion",
+    "register": "S'inscrire",
+    "profile": "Profil",
+    "logout": "Déconnexion"
+  },
+  "home": {
+    "tagline": "Découvrez le Cameroun, un lieu à la fois.",
+    "cta": "Commencer à explorer"
+  },
+  "footer": {
+    "rights": "Tous droits réservés."
+  }
+}
