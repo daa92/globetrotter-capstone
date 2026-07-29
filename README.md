@@ -87,6 +87,12 @@ circuit breakers, tracing).
 | POST | `/places/{id}/reject` | Admin | Reject a submission |
 | POST | `/feedback` | Yes | Submit feedback |
 | GET | `/feedback` | Admin | List all feedback |
+| POST | `/users/me/activity/heartbeat` | Yes | Report active usage time (drives daily earnings) |
+| GET | `/users/me/earnings` | Yes | Full earnings breakdown: usage days, referrals, feedback, totals in USD/FCFA, payout eligibility |
+| POST | `/users/me/payouts/request` | Yes | Request a payout (requires $30+ balance, 5+ referrals, 5+ good feedback) |
+| GET | `/admin/payouts` | Admin | List payout requests (`?status_filter=pending\|approved\|rejected\|all`) |
+| POST | `/admin/payouts/{id}/approve` | Admin | Approve a payout request |
+| POST | `/admin/payouts/{id}/reject` | Admin | Reject a payout request |
 | GET | `/health` | No | Liveness probe |
 
 Interactive docs (auto-generated): `http://localhost:8000/docs`
@@ -313,6 +319,38 @@ python testing/simulation/chaos_probe.py --host http://localhost:8000
 
 Neither tool is imported by app code or included in the production Docker
 image — verified via `.dockerignore` and the separate `Dockerfile`.
+
+## Earnings / referrals / payouts
+
+Implements: $0.50/day for 5+ minutes of active use, $0.25 per verified
+referral, and a payout system with a $30 minimum requiring 5 referrals +
+5 feedback submissions rated 4-5 stars.
+
+- **Activity tracking**: the frontend/CLI should call
+  `POST /users/me/activity/heartbeat` roughly every 60–90 seconds while
+  the user is actively using the app, with `elapsed_seconds` since the
+  last call. A single call can't add more than
+  `MAX_HEARTBEAT_INCREMENT_SECONDS` (90s default) — this stops a client
+  from just claiming a huge jump in one request.
+- **Referral crediting happens at verification, not registration** — an
+  unverified referral would just get deleted by the 30-minute cleanup job
+  anyway, so this doubles as the anti-fake-signup gate for the referral
+  bonus.
+- **Nothing is stored as a running balance.** Every number in
+  `GET /users/me/earnings` is computed fresh from the underlying activity/
+  referral/feedback/payout records every time. Given Phase 1's JSON
+  storage has no transactions, a stored balance could drift from the
+  records it's supposed to represent; computing on read avoids that whole
+  class of bug.
+- **FCFA conversion** uses a fixed rate (`FCFA_PER_USD` in `.env`, default
+  610) rather than a live exchange-rate API — XAF is pegged to the EUR,
+  not freely floating, so this is normal practice, not a shortcut.
+- **No real payment processor is wired in.** `POST /users/me/payouts/request`
+  creates a request an admin approves/rejects via
+  `POST /admin/payouts/{id}/approve` — actually moving money to a user
+  (Mobile Money, bank transfer, etc.) is a manual step for now, since
+  integrating a real payment processor needs a paid account you'll need
+  to set up yourself when you're ready to launch.
 
 ## Security notes (Phase 1)
 

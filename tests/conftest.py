@@ -26,6 +26,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "PLACES_FILE", str(data_dir / "places.json"))
     monkeypatch.setattr(storage, "FEEDBACK_FILE", str(data_dir / "feedback.json"))
     monkeypatch.setattr(storage, "OUTBOX_FILE", str(data_dir / "outbox.json"))
+    monkeypatch.setattr(storage, "ACTIVITY_FILE", str(data_dir / "activity.json"))
+    monkeypatch.setattr(storage, "REFERRALS_FILE", str(data_dir / "referrals.json"))
+    monkeypatch.setattr(storage, "PAYOUTS_FILE", str(data_dir / "payouts.json"))
 
     seed = [
         {

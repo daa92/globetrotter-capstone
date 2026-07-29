@@ -19,6 +19,7 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     preferences: list[str] = Field(default_factory=list)
+    referral_code: Optional[str] = Field(default=None, description="Referral code of the user who invited you, if any")
 
     @field_validator("password")
     @classmethod
@@ -68,6 +69,7 @@ class UserPublic(BaseModel):
     profile_picture_url: Optional[str] = None
     mfa_enabled: bool = False
     is_verified: bool = False
+    referral_code: str
     created_at: str
 
 
@@ -146,3 +148,58 @@ class FeedbackCreate(BaseModel):
     category: str = Field(description="bug | suggestion | place_report | other")
     message: str = Field(min_length=5, max_length=2000)
     rating: Optional[int] = Field(default=None, ge=1, le=5)
+
+
+# ---------------------------------------------------------------------------
+# Earnings / referrals / payouts
+# ---------------------------------------------------------------------------
+
+class HeartbeatRequest(BaseModel):
+    elapsed_seconds: int = Field(ge=1, le=3600, description="Seconds active since the last heartbeat")
+
+
+class DailyActivity(BaseModel):
+    date: str
+    active_seconds: int
+    qualified: bool  # met the daily usage threshold
+
+
+class RequirementStatus(BaseModel):
+    met: bool
+    have: float
+    need: float
+
+
+class PayoutEligibility(BaseModel):
+    eligible: bool
+    balance: RequirementStatus
+    referrals: RequirementStatus
+    good_feedback: RequirementStatus
+    has_pending_payout: bool
+
+
+class EarningsResponse(BaseModel):
+    qualifying_days: int
+    usage_earnings_usd: float
+    referral_count: int
+    referral_earnings_usd: float
+    good_feedback_count: int
+    total_earned_usd: float
+    total_paid_out_usd: float
+    available_usd: float
+    available_fcfa: float
+    fcfa_rate: float
+    referral_code: str
+    referral_link: str
+    today_active_seconds: int
+    today_threshold_seconds: int
+    daily_log: list[DailyActivity]
+    payout_eligibility: PayoutEligibility
+
+
+class PayoutRequestResult(BaseModel):
+    id: str
+    amount_usd: float
+    amount_fcfa: float
+    status: str
+    requested_at: str

@@ -23,12 +23,14 @@ destinations_app = typer.Typer(help="Search the Cameroon destination catalogue."
 itineraries_app = typer.Typer(help="Plan and manage your trips.")
 places_app = typer.Typer(help="Advertise a place / view your submissions.")
 feedback_app = typer.Typer(help="Send feedback to the GT team.")
+earnings_app = typer.Typer(help="Track usage, view earnings, request a payout.")
 
 app.add_typer(auth_app, name="auth")
 app.add_typer(destinations_app, name="destinations")
 app.add_typer(itineraries_app, name="itineraries")
 app.add_typer(places_app, name="places")
 app.add_typer(feedback_app, name="feedback")
+app.add_typer(earnings_app, name="earnings")
 
 console = Console()
 
@@ -50,13 +52,14 @@ def auth_register(
     email: str = typer.Option(..., prompt=True),
     password: str = typer.Option(..., prompt=True, hide_input=True, confirmation_prompt=True),
     preferences: str = typer.Option("", help="Comma-separated tags, e.g. beach,hiking"),
+    referral_code: Optional[str] = typer.Option(None, help="Referral code of the user who invited you, if any"),
 ):
     """Create a new GT account. You'll need to verify it (check your email)
     within 30 minutes before you can log in, or the account is deleted."""
     client = GTClient()
     prefs = [p.strip() for p in preferences.split(",") if p.strip()]
     try:
-        client.register(username, email, password, prefs)
+        client.register(username, email, password, prefs, referral_code=referral_code)
     except GTApiError as exc:
         _handle_error(exc)
         return
@@ -329,6 +332,60 @@ def feedback_submit(
         _handle_error(exc)
         return
     console.print("[bold green]Thanks — feedback submitted.[/bold green]")
+
+
+# ---------------------------------------------------------------------------
+# earnings
+# ---------------------------------------------------------------------------
+
+@earnings_app.command("heartbeat")
+def earnings_heartbeat(elapsed_seconds: int = typer.Argument(90, help="Seconds active since your last heartbeat")):
+    """Report active usage time — call this periodically while using the app."""
+    client = GTClient()
+    try:
+        result = client.heartbeat(elapsed_seconds)
+    except GTApiError as exc:
+        _handle_error(exc)
+        return
+    status_msg = "5-min daily threshold met!" if result["threshold_met"] else "not yet at today's 5-min threshold"
+    console.print(f"Today: {result['active_seconds']}s active — {status_msg}")
+
+
+@earnings_app.command("show")
+def earnings_show():
+    """Show your full earnings breakdown: usage days, referrals, feedback, payout eligibility."""
+    client = GTClient()
+    try:
+        e = client.earnings()
+    except GTApiError as exc:
+        _handle_error(exc)
+        return
+
+    console.print(f"[bold]Total earned:[/bold] ${e['total_earned_usd']} (FCFA {e['available_fcfa']:,.0f} available)")
+    console.print(f"  Usage: {e['qualifying_days']} qualifying day(s) -> ${e['usage_earnings_usd']}")
+    console.print(f"  Referrals: {e['referral_count']} -> ${e['referral_earnings_usd']}")
+    console.print(f"  Good feedback given: {e['good_feedback_count']}")
+    console.print(f"  Your referral link: {e['referral_link']}")
+
+    elig = e["payout_eligibility"]
+    console.print("\n[bold]Payout eligibility:[/bold]")
+    for key in ("balance", "referrals", "good_feedback"):
+        req = elig[key]
+        mark = "[green]✓[/green]" if req["met"] else "[red]✗[/red]"
+        console.print(f"  {mark} {key}: {req['have']} / {req['need']}")
+    console.print(f"  {'[bold green]Eligible for payout![/bold green]' if elig['eligible'] else '[dim]Not yet eligible.[/dim]'}")
+
+
+@earnings_app.command("request-payout")
+def earnings_request_payout():
+    """Request a payout, if eligible."""
+    client = GTClient()
+    try:
+        result = client.request_payout()
+    except GTApiError as exc:
+        _handle_error(exc)
+        return
+    console.print(f"[bold green]Payout requested:[/bold green] ${result['amount_usd']} (FCFA {result['amount_fcfa']:,.0f}) — status: {result['status']}")
 
 
 # ---------------------------------------------------------------------------

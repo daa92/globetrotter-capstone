@@ -27,6 +27,9 @@ DESTINATIONS_FILE = os.path.join(DATA_DIR, "destinations.json")
 PLACES_FILE = os.path.join(DATA_DIR, "places.json")
 FEEDBACK_FILE = os.path.join(DATA_DIR, "feedback.json")
 OUTBOX_FILE = os.path.join(DATA_DIR, "outbox.json")
+ACTIVITY_FILE = os.path.join(DATA_DIR, "activity.json")
+REFERRALS_FILE = os.path.join(DATA_DIR, "referrals.json")
+PAYOUTS_FILE = os.path.join(DATA_DIR, "payouts.json")
 
 _lock = threading.Lock()
 

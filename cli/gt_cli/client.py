@@ -97,11 +97,11 @@ class GTClient:
 
     # -- public API -------------------------------------------------------
 
-    def register(self, username: str, email: str, password: str, preferences: list[str]) -> dict:
-        return self._request(
-            "POST", "/auth/register",
-            json={"username": username, "email": email, "password": password, "preferences": preferences},
-        )
+    def register(self, username: str, email: str, password: str, preferences: list[str], referral_code: Optional[str] = None) -> dict:
+        payload = {"username": username, "email": email, "password": password, "preferences": preferences}
+        if referral_code:
+            payload["referral_code"] = referral_code
+        return self._request("POST", "/auth/register", json=payload)
 
     def verify(self, token: str) -> dict:
         return self._request("POST", "/auth/verify", json={"token": token})
@@ -158,3 +158,12 @@ class GTClient:
 
     def submit_feedback(self, category: str, message: str, rating: Optional[int] = None) -> dict:
         return self._request("POST", "/feedback", auth=True, json={"category": category, "message": message, "rating": rating})
+
+    def heartbeat(self, elapsed_seconds: int) -> dict:
+        return self._request("POST", "/users/me/activity/heartbeat", auth=True, json={"elapsed_seconds": elapsed_seconds})
+
+    def earnings(self) -> dict:
+        return self._request("GET", "/users/me/earnings", auth=True)
+
+    def request_payout(self) -> dict:
+        return self._request("POST", "/users/me/payouts/request", auth=True)

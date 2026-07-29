@@ -59,6 +59,15 @@ def register(payload: UserRegister):
     if any(u["email"] == payload.email for u in users):
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
 
+    sponsor = None
+    if payload.referral_code:
+        sponsor = next((u for u in users if u["referral_code"] == payload.referral_code), None)
+        if not sponsor:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid referral code")
+        # Note: no separate "can't refer yourself" check needed here — the
+        # username-uniqueness check above already guarantees payload.username
+        # can't match an existing user's (the sponsor's) username.
+
     verification_token = str(uuid.uuid4())
     user = {
         "username": payload.username,
@@ -71,6 +80,8 @@ def register(payload: UserRegister):
         "is_admin": False,
         "is_verified": False,
         "verification_token": verification_token,
+        "referral_code": uuid.uuid4().hex[:8].upper(),
+        "referred_by": sponsor["username"] if sponsor else None,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     storage.append(storage.USERS_FILE, user)
@@ -103,6 +114,17 @@ def verify_account(payload: VerifyRequest):
         storage.USERS_FILE, "username", user["username"],
         {"is_verified": True},
     )
+
+    # Credit the sponsor now, not at registration — an unverified referral
+    # would just get deleted by the 30-minute cleanup job anyway, so this
+    # is also the natural anti-abuse gate against fake referral signups.
+    if user.get("referred_by"):
+        storage.append(storage.REFERRALS_FILE, {
+            "sponsor_username": user["referred_by"],
+            "referred_username": user["username"],
+            "amount_usd": settings.REFERRAL_BONUS_USD,
+            "credited_at": datetime.now(timezone.utc).isoformat(),
+        })
     return {"detail": "Account verified — you can now log in."}
 
 
