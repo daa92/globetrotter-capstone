@@ -2,14 +2,31 @@
 app/__init__.py
 
 FastAPI application factory. Kept small on purpose: this file's only job
-is wiring — middleware, routers, and the health check. Business logic
-always lives in routers/, never here.
+is wiring — middleware, routers, background tasks, and the health check.
+Business logic always lives in routers/, never here.
 """
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.cleanup import run_cleanup_loop
 from app.config import settings
 from app.routers import auth, destinations, feedback, itineraries, places, recommendations, users
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Background task: purges unverified accounts older than
+    # UNVERIFIED_ACCOUNT_TTL_MINUTES, every VERIFICATION_CLEANUP_INTERVAL_SECONDS.
+    cleanup_task = asyncio.create_task(run_cleanup_loop())
+    yield
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
 
 
 def create_app() -> FastAPI:
@@ -19,6 +36,7 @@ def create_app() -> FastAPI:
         version="0.1.0-phase1",
         docs_url="/docs",
         redoc_url="/redoc",
+        lifespan=lifespan,
     )
 
     app.add_middleware(

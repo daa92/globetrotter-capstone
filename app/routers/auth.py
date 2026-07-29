@@ -14,6 +14,7 @@ Auth flow:
   6. POST /auth/refresh             -> read refresh cookie -> new access token
   7. POST /auth/logout              -> clear refresh cookie
 """
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
@@ -22,14 +23,16 @@ from jose import JWTError
 from app import security, storage
 from app.config import settings
 from app.dependencies import get_current_user
+from app.notifications import outbox
 from app.schemas import (
     MFAConfirmRequest,
     MFALoginChallenge,
     MFASetupResponse,
+    RegisterResponse,
     TokenResponse,
     UserLogin,
-    UserPublic,
     UserRegister,
+    VerifyRequest,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -48,7 +51,7 @@ def _set_refresh_cookie(response: Response, username: str) -> None:
     )
 
 
-@router.post("/register", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: UserRegister):
     users = storage.read_all(storage.USERS_FILE)
     if any(u["username"] == payload.username for u in users):
@@ -56,6 +59,7 @@ def register(payload: UserRegister):
     if any(u["email"] == payload.email for u in users):
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
 
+    verification_token = str(uuid.uuid4())
     user = {
         "username": payload.username,
         "email": payload.email,
@@ -65,10 +69,41 @@ def register(payload: UserRegister):
         "mfa_enabled": False,
         "mfa_secret": None,
         "is_admin": False,
+        "is_verified": False,
+        "verification_token": verification_token,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     storage.append(storage.USERS_FILE, user)
-    return UserPublic(**user)
+
+    outbox.send(
+        to=payload.email,
+        subject="Verify your GT account",
+        body=(
+            f"Welcome to GT! Verify your account within "
+            f"{settings.UNVERIFIED_ACCOUNT_TTL_MINUTES} minutes using this token: "
+            f"{verification_token}\n\n"
+            f"(In production this would be a clickable link to "
+            f"https://your-domain/verify?token={verification_token})"
+        ),
+    )
+
+    return RegisterResponse(**user)
+
+
+@router.post("/verify")
+def verify_account(payload: VerifyRequest):
+    users = storage.read_all(storage.USERS_FILE)
+    user = next((u for u in users if u.get("verification_token") == payload.token), None)
+    if not user:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or already-used verification token")
+    if user.get("is_verified"):
+        return {"detail": "Account already verified"}
+
+    storage.update_one(
+        storage.USERS_FILE, "username", user["username"],
+        {"is_verified": True},
+    )
+    return {"detail": "Account verified — you can now log in."}
 
 
 def _authenticate(username: str, password: str) -> dict:
@@ -82,6 +117,13 @@ def _authenticate(username: str, password: str) -> dict:
 @router.post("/login")
 def login(payload: UserLogin, response: Response):
     user = _authenticate(payload.username, payload.password)
+
+    if not user.get("is_verified", False):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Account not yet verified. Check your email for the verification token "
+            f"(expires {settings.UNVERIFIED_ACCOUNT_TTL_MINUTES} minutes after registration).",
+        )
 
     if user.get("mfa_enabled"):
         if not payload.mfa_code:

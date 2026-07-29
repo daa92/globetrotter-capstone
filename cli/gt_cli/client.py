@@ -103,6 +103,9 @@ class GTClient:
             json={"username": username, "email": email, "password": password, "preferences": preferences},
         )
 
+    def verify(self, token: str) -> dict:
+        return self._request("POST", "/auth/verify", json={"token": token})
+
     def login(self, username: str, password: str, mfa_code: Optional[str] = None) -> dict:
         payload = {"username": username, "password": password}
         if mfa_code:

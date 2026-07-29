@@ -1,8 +1,27 @@
+from app import storage
+from app.notifications import outbox
+
+
 def _register(client, username="alice", password="s3cr3t12"):
     return client.post(
         "/auth/register",
         json={"username": username, "email": f"{username}@example.com", "password": password, "preferences": ["beach"]},
     )
+
+
+def _verify(client, email):
+    """Pulls the verification token straight from the outbox (our stub email/SMS
+    sender) and confirms it, the way clicking an email link would in production."""
+    message = outbox.get_last_message_to(email)
+    token = message["body"].split("token: ")[1].split("\n")[0]
+    resp = client.post("/auth/verify", json={"token": token})
+    assert resp.status_code == 200, resp.text
+    return token
+
+
+def _register_and_verify(client, username="alice", password="s3cr3t12"):
+    _register(client, username, password)
+    _verify(client, f"{username}@example.com")
 
 
 def test_register_success(client):
@@ -20,13 +39,13 @@ def test_register_duplicate_username_rejected(client):
 
 
 def test_login_wrong_password_rejected(client):
-    _register(client)
+    _register_and_verify(client)
     resp = client.post("/auth/login", json={"username": "alice", "password": "wrong-pass1"})
     assert resp.status_code == 401
 
 
 def test_login_success_returns_access_token_and_refresh_cookie(client):
-    _register(client)
+    _register_and_verify(client)
     resp = client.post("/auth/login", json={"username": "alice", "password": "s3cr3t12"})
     assert resp.status_code == 200
     assert "access_token" in resp.json()
@@ -39,7 +58,7 @@ def test_protected_route_requires_token(client):
 
 
 def test_protected_route_with_valid_token(client):
-    _register(client)
+    _register_and_verify(client)
     login_resp = client.post("/auth/login", json={"username": "alice", "password": "s3cr3t12"})
     token = login_resp.json()["access_token"]
     resp = client.get("/users/me", headers={"Authorization": f"Bearer {token}"})
@@ -50,7 +69,7 @@ def test_protected_route_with_valid_token(client):
 def test_mfa_full_enrollment_and_login_flow(client):
     import pyotp
 
-    _register(client)
+    _register_and_verify(client)
     login_resp = client.post("/auth/login", json={"username": "alice", "password": "s3cr3t12"})
     token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}

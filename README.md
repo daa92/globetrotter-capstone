@@ -63,8 +63,9 @@ circuit breakers, tracing).
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/auth/register` | No | Create an account |
-| POST | `/auth/login` | No | Login; returns tokens, or an MFA challenge if enabled |
+| POST | `/auth/register` | No | Create an account (unverified — deleted after 30 min if not verified) |
+| POST | `/auth/verify` | No | Verify a new account with the token sent at registration |
+| POST | `/auth/login` | No | Login (requires a verified account); returns tokens, or an MFA challenge if enabled |
 | POST | `/auth/mfa/setup` | Yes | Generate a TOTP secret + QR provisioning URI |
 | POST | `/auth/mfa/confirm` | Yes | Confirm a TOTP code, enabling MFA |
 | POST | `/auth/mfa/disable` | Yes | Disable MFA |
@@ -162,52 +163,83 @@ This mirrors exactly what the automated tests check, but lets you see the
 raw JSON and the refresh cookie yourself.
 
 ```bash
-# 1. Register
+# 1. Register — creates an UNVERIFIED account and "sends" a verification
+#    email (in dev, this just gets logged to data/outbox.json — see
+#    "Account verification" below). Unverified accounts are deleted after
+#    30 minutes.
 curl -s -X POST http://localhost:8000/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username":"jane_doe","email":"jane@example.com","password":"TripLover1","preferences":["beach","culture"]}'
 
-# 2. Login — save cookies to a jar so we can test /auth/refresh afterwards
+# 2. Grab the verification token from the outbox and verify
+TOKEN_LINE=$(python3 -c "
+import json
+outbox = json.load(open('data/outbox.json'))
+msg = [m for m in outbox if m['to']=='jane@example.com'][-1]
+print(msg['body'].split('token: ')[1].split(chr(10))[0])
+")
+curl -s -X POST http://localhost:8000/auth/verify -H "Content-Type: application/json" -d "{\"token\":\"$TOKEN_LINE\"}"
+
+# 3. NOW login works — save cookies to a jar so we can test /auth/refresh afterwards
 LOGIN_RESP=$(curl -s -c cookies.txt -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"jane_doe","password":"TripLover1"}')
 echo "$LOGIN_RESP"
 TOKEN=$(echo "$LOGIN_RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
 
-# 3. Call a protected route with the access token
+# 4. Call a protected route with the access token
 curl -s http://localhost:8000/users/me -H "Authorization: Bearer $TOKEN"
 
-# 4. Search destinations (public, no token needed)
+# 5. Search destinations (public, no token needed)
 curl -s "http://localhost:8000/destinations?tag=beach"
 
-# 5. Get personalised recommendations
+# 6. Get personalised recommendations
 curl -s http://localhost:8000/recommendations -H "Authorization: Bearer $TOKEN"
 
-# 6. Create an itinerary
+# 7. Create an itinerary
 curl -s -X POST http://localhost:8000/itineraries -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title":"Coastal weekend","destinations":["limbe-botanic-beach"],"start_date":"2026-09-01","end_date":"2026-09-03"}'
 
-# 7. Submit a place ("advertise" it) — lands as status=pending
+# 8. Submit a place ("advertise" it) — lands as status=pending
 curl -s -X POST http://localhost:8000/places -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"Test Falls","region":"West","tags":["waterfall","nature"],"description":"A beautiful hidden waterfall near a small village, great for a day trip.","image_url":"https://example.com/falls.jpg","latitude":5.5,"longitude":10.5,"avg_cost_fcfa":2000}'
 
-# 8. Submit feedback
+# 9. Submit feedback
 curl -s -X POST http://localhost:8000/feedback -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"category":"suggestion","message":"Would love a filter by season.","rating":5}'
 
-# 9. Refresh the access token using the httpOnly cookie saved in step 2
+# 10. Refresh the access token using the httpOnly cookie saved in step 3
 curl -s -b cookies.txt -X POST http://localhost:8000/auth/refresh
 
-# 10. Logout — clears the refresh cookie server-side
+# 11. Logout — clears the refresh cookie server-side
 curl -s -b cookies.txt -X POST http://localhost:8000/auth/logout
 ```
 
 `-c cookies.txt` tells curl to *save* cookies from the response; `-b cookies.txt`
-tells it to *send* them on the next request — that's how step 9 gets the
-refresh cookie that step 2 received, exactly like a browser would.
+tells it to *send* them on the next request — that's how step 10 gets the
+refresh cookie that step 3 received, exactly like a browser would.
+
+### Account verification (dev/local)
+
+There's no real email/SMS provider wired in yet (that needs paid/free-tier
+credentials from a real provider — deliberately not hardcoded into this
+repo). In dev, "sending" a verification message just appends it to
+`data/outbox.json`, which is exactly what the script above reads from —
+open that file yourself after registering to see it, or use the snippet
+above to extract the token programmatically.
+
+**Unverified accounts are deleted automatically 30 minutes after
+registration** — this runs as a background task inside the API process
+(see `app/cleanup.py`), checked every 60 seconds. To see it happen faster
+than waiting 30 minutes, either lower `UNVERIFIED_ACCOUNT_TTL_MINUTES` in
+`.env` temporarily, or call the purge function directly in a Python shell:
+
+```bash
+python3 -c "from app.cleanup import purge_unverified_users; print(purge_unverified_users())"
+```
 
 ### Testing MFA manually
 
@@ -298,6 +330,7 @@ This is the point of Phase 1 — experience these first-hand:
 - No database, no indexing, no transactions.
 - Single process — one bug can take down the whole API.
 - No caching, no message queue, no circuit breakers (arriving in Phase 4).
+- No real email/SMS provider — verification and (future) password-reset messages are logged to `data/outbox.json` instead of actually sent. Swapping in a real provider (see `app/notifications/outbox.py`) is a small, isolated change whenever you're ready to pay for one (or use a free tier like Mailtrap/SendGrid for email, or a free-tier SMS API).
 
 ## Roadmap
 

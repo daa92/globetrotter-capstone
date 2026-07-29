@@ -1,8 +1,15 @@
+from app.notifications import outbox
+
+
 def _register_and_login(client, preferences):
     client.post(
         "/auth/register",
         json={"username": "bob", "email": "bob@example.com", "password": "s3cr3t12", "preferences": preferences},
     )
+    message = outbox.get_last_message_to("bob@example.com")
+    token = message["body"].split("token: ")[1].split("\n")[0]
+    client.post("/auth/verify", json={"token": token})
+
     resp = client.post("/auth/login", json={"username": "bob", "password": "s3cr3t12"})
     return resp.json()["access_token"]
 

@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # --- MFA ---
     MFA_ISSUER_NAME: str = "GlobeTrotter"
 
+    # --- Account verification ---
+    UNVERIFIED_ACCOUNT_TTL_MINUTES: int = 30
+    VERIFICATION_CLEANUP_INTERVAL_SECONDS: int = 60
+
     # --- CORS (tighten in production to your real frontend origins) ---
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",

@@ -67,7 +67,16 @@ class UserPublic(BaseModel):
     preferences: list[str] = Field(default_factory=list)
     profile_picture_url: Optional[str] = None
     mfa_enabled: bool = False
+    is_verified: bool = False
     created_at: str
+
+
+class VerifyRequest(BaseModel):
+    token: str
+
+
+class RegisterResponse(UserPublic):
+    detail: str = "Account created. Check your email for a verification link — it expires in 30 minutes."
 
 
 class UserProfileUpdate(BaseModel):

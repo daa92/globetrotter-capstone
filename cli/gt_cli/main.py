@@ -51,7 +51,8 @@ def auth_register(
     password: str = typer.Option(..., prompt=True, hide_input=True, confirmation_prompt=True),
     preferences: str = typer.Option("", help="Comma-separated tags, e.g. beach,hiking"),
 ):
-    """Create a new GT account."""
+    """Create a new GT account. You'll need to verify it (check your email)
+    within 30 minutes before you can log in, or the account is deleted."""
     client = GTClient()
     prefs = [p.strip() for p in preferences.split(",") if p.strip()]
     try:
@@ -59,7 +60,23 @@ def auth_register(
     except GTApiError as exc:
         _handle_error(exc)
         return
-    console.print(f"[bold green]Account created for {username}.[/bold green] Now run `gt auth login`.")
+    console.print(
+        f"[bold green]Account created for {username}.[/bold green] "
+        "Check your email for a verification token, then run `gt auth verify <token>` "
+        "within 30 minutes — unverified accounts are automatically deleted."
+    )
+
+
+@auth_app.command("verify")
+def auth_verify(token: str = typer.Argument(..., help="Verification token from your email")):
+    """Verify a newly registered account."""
+    client = GTClient()
+    try:
+        client.verify(token)
+    except GTApiError as exc:
+        _handle_error(exc)
+        return
+    console.print("[bold green]Account verified.[/bold green] You can now `gt auth login`.")
 
 
 @auth_app.command("login")
