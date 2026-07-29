@@ -93,6 +93,12 @@ circuit breakers, tracing).
 | GET | `/admin/payouts` | Admin | List payout requests (`?status_filter=pending\|approved\|rejected\|all`) |
 | POST | `/admin/payouts/{id}/approve` | Admin | Approve a payout request |
 | POST | `/admin/payouts/{id}/reject` | Admin | Reject a payout request |
+| GET | `/notifications` | Yes | List your notifications (`?unread_only=true`) |
+| GET | `/notifications/unread-count` | Yes | Just the unread count, for a bell badge |
+| POST | `/notifications/mark-read` | Yes | `{"ids": [...]}` or `{"all": true}` |
+| DELETE | `/notifications/{id}` | Yes | Delete a single notification |
+| POST | `/notifications/delete` | Yes | Bulk delete: `{"ids": [...]}` or `{"all": true}` |
+| POST | `/admin/notifications/send` | Admin | Push a notification to specific users or `broadcast: true` for everyone; `also_email: true` to also email |
 | GET | `/health` | No | Liveness probe |
 
 Interactive docs (auto-generated): `http://localhost:8000/docs`
@@ -319,6 +325,26 @@ python testing/simulation/chaos_probe.py --host http://localhost:8000
 
 Neither tool is imported by app code or included in the production Docker
 image — verified via `.dockerignore` and the separate `Dockerfile`.
+
+## Notifications
+
+The in-app notification center (`app/routers/notifications.py`) is deliberately
+separate from `app/notifications/outbox.py` (the raw email/SMS channel) —
+a single event often writes to both: an in-app notification the user sees
+immediately, and optionally an email if they have one and it's warranted.
+
+- **Automatic notifications** already fire from: a referral getting credited,
+  a payout being approved/rejected, and a place submission being approved/
+  rejected. Wiring a new event in is one call to
+  `create_notification(username, title, message, category)`.
+- **Ownership is enforced server-side, not trusted from the client.** Bulk
+  mark-read/delete accept a list of IDs, but the route always intersects
+  that list with the caller's *own* notification IDs first — passing
+  someone else's ID just gets silently ignored rather than acted on. This
+  is tested directly (`test_cannot_delete_or_read_someone_elses_notification`).
+- **Admin broadcast** (`broadcast: true`) sends to literally every user —
+  there's no pagination/throttling yet, fine at Phase 1 scale, worth
+  revisiting once the user base is large enough for that to matter.
 
 ## Earnings / referrals / payouts
 

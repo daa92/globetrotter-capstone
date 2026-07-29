@@ -30,6 +30,7 @@ OUTBOX_FILE = os.path.join(DATA_DIR, "outbox.json")
 ACTIVITY_FILE = os.path.join(DATA_DIR, "activity.json")
 REFERRALS_FILE = os.path.join(DATA_DIR, "referrals.json")
 PAYOUTS_FILE = os.path.join(DATA_DIR, "payouts.json")
+NOTIFICATIONS_FILE = os.path.join(DATA_DIR, "notifications.json")
 
 _lock = threading.Lock()
 
@@ -91,3 +92,27 @@ def delete_one(filepath: str, match_key: str, match_value: Any) -> bool:
             return False
         _write_json(filepath, new_records)
         return True
+
+
+def update_many(filepath: str, match_key: str, match_values: set, updates: dict[str, Any]) -> int:
+    """Update every record whose record[match_key] is in match_values. Returns count updated."""
+    with _lock:
+        records = _read_json(filepath)
+        count = 0
+        for record in records:
+            if record.get(match_key) in match_values:
+                record.update(updates)
+                count += 1
+        if count:
+            _write_json(filepath, records)
+        return count
+
+
+def delete_many(filepath: str, match_key: str, match_values: set) -> int:
+    with _lock:
+        records = _read_json(filepath)
+        new_records = [r for r in records if r.get(match_key) not in match_values]
+        count = len(records) - len(new_records)
+        if count:
+            _write_json(filepath, new_records)
+        return count

@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app import storage
 from app.dependencies import get_current_admin, get_current_user
+from app.notifications.service import create_notification
 from app.schemas import PlaceSubmission
 
 router = APIRouter(prefix="/places", tags=["places"])
@@ -68,12 +69,26 @@ def approve_place(place_id: str, admin: dict = Depends(get_current_admin)):
         "submitted_by": place["submitted_by"],
     }
     storage.append(storage.DESTINATIONS_FILE, destination)
+    create_notification(
+        username=place["submitted_by"],
+        title="Your place submission was approved!",
+        message=f"'{place['name']}' is now live in the GT catalogue.",
+        category="place",
+    )
     return {"detail": "Approved and published", "destination_id": destination["id"]}
 
 
 @router.post("/{place_id}/reject")
 def reject_place(place_id: str, admin: dict = Depends(get_current_admin)):
-    updated = storage.update_one(storage.PLACES_FILE, "id", place_id, {"status": "rejected"})
-    if not updated:
+    places = storage.read_all(storage.PLACES_FILE)
+    place = next((p for p in places if p["id"] == place_id), None)
+    if not place:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Submission not found")
+    storage.update_one(storage.PLACES_FILE, "id", place_id, {"status": "rejected"})
+    create_notification(
+        username=place["submitted_by"],
+        title="Your place submission was rejected",
+        message=f"'{place['name']}' wasn't approved for the catalogue. Contact support for details.",
+        category="place",
+    )
     return {"detail": "Rejected"}

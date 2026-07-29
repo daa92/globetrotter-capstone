@@ -167,3 +167,18 @@ class GTClient:
 
     def request_payout(self) -> dict:
         return self._request("POST", "/users/me/payouts/request", auth=True)
+
+    def list_notifications(self, unread_only: bool = False) -> list[dict]:
+        return self._request("GET", "/notifications", auth=True, params={"unread_only": unread_only})
+
+    def unread_notification_count(self) -> int:
+        return self._request("GET", "/notifications/unread-count", auth=True)["unread_count"]
+
+    def mark_notifications_read(self, ids: Optional[list[str]] = None, all_: bool = False) -> dict:
+        return self._request("POST", "/notifications/mark-read", auth=True, json={"ids": ids, "all": all_})
+
+    def delete_notification(self, notification_id: str) -> None:
+        self._request("DELETE", f"/notifications/{notification_id}", auth=True)
+
+    def delete_notifications(self, ids: Optional[list[str]] = None, all_: bool = False) -> dict:
+        return self._request("POST", "/notifications/delete", auth=True, json={"ids": ids, "all": all_})

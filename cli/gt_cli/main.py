@@ -24,6 +24,7 @@ itineraries_app = typer.Typer(help="Plan and manage your trips.")
 places_app = typer.Typer(help="Advertise a place / view your submissions.")
 feedback_app = typer.Typer(help="Send feedback to the GT team.")
 earnings_app = typer.Typer(help="Track usage, view earnings, request a payout.")
+notifications_app = typer.Typer(help="View, mark read, or delete your notifications.")
 
 app.add_typer(auth_app, name="auth")
 app.add_typer(destinations_app, name="destinations")
@@ -31,6 +32,7 @@ app.add_typer(itineraries_app, name="itineraries")
 app.add_typer(places_app, name="places")
 app.add_typer(feedback_app, name="feedback")
 app.add_typer(earnings_app, name="earnings")
+app.add_typer(notifications_app, name="notifications")
 
 console = Console()
 
@@ -386,6 +388,82 @@ def earnings_request_payout():
         _handle_error(exc)
         return
     console.print(f"[bold green]Payout requested:[/bold green] ${result['amount_usd']} (FCFA {result['amount_fcfa']:,.0f}) — status: {result['status']}")
+
+
+# ---------------------------------------------------------------------------
+# notifications
+# ---------------------------------------------------------------------------
+
+@notifications_app.command("list")
+def notifications_list(unread_only: bool = typer.Option(False, "--unread-only")):
+    """List your notifications, newest first."""
+    client = GTClient()
+    try:
+        items = client.list_notifications(unread_only=unread_only)
+    except GTApiError as exc:
+        _handle_error(exc)
+        return
+    if not items:
+        console.print("No notifications." if not unread_only else "No unread notifications.")
+        raise typer.Exit()
+    table = Table()
+    table.add_column("")
+    table.add_column("ID")
+    table.add_column("Title")
+    table.add_column("Category")
+    table.add_column("Sent")
+    for n in items:
+        mark = " " if n["is_read"] else "[bold green]●[/bold green]"
+        table.add_row(mark, n["id"][:8], n["title"], n["category"], n["created_at"])
+    console.print(table)
+    for n in items:
+        if not n["is_read"]:
+            console.print(f"\n[bold]{n['title']}[/bold]\n{n['message']}")
+
+
+@notifications_app.command("unread-count")
+def notifications_unread_count():
+    """Just the unread count — handy for a shell prompt or script."""
+    client = GTClient()
+    try:
+        count = client.unread_notification_count()
+    except GTApiError as exc:
+        _handle_error(exc)
+        return
+    console.print(str(count))
+
+
+@notifications_app.command("read")
+def notifications_mark_read(
+    ids: list[str] = typer.Argument(None, help="Notification IDs to mark read (omit with --all)"),
+    all_: bool = typer.Option(False, "--all", help="Mark every notification as read"),
+):
+    """Mark one, some, or all notifications as read."""
+    client = GTClient()
+    try:
+        result = client.mark_notifications_read(ids=ids or None, all_=all_)
+    except GTApiError as exc:
+        _handle_error(exc)
+        return
+    console.print(f"Marked {result['marked_read']} notification(s) as read.")
+
+
+@notifications_app.command("delete")
+def notifications_delete(
+    ids: list[str] = typer.Argument(None, help="Notification IDs to delete (omit with --all)"),
+    all_: bool = typer.Option(False, "--all", help="Delete every notification"),
+):
+    """Delete one, some, or all notifications."""
+    client = GTClient()
+    try:
+        if ids and len(ids) == 1 and not all_:
+            client.delete_notification(ids[0])
+            console.print("Deleted 1 notification.")
+        else:
+            result = client.delete_notifications(ids=ids or None, all_=all_)
+            console.print(f"Deleted {result['deleted']} notification(s).")
+    except GTApiError as exc:
+        _handle_error(exc)
 
 
 # ---------------------------------------------------------------------------

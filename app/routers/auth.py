@@ -24,6 +24,7 @@ from app import security, storage
 from app.config import settings
 from app.dependencies import get_current_user
 from app.notifications import outbox
+from app.notifications.service import create_notification
 from app.schemas import (
     MFAConfirmRequest,
     MFALoginChallenge,
@@ -125,6 +126,12 @@ def verify_account(payload: VerifyRequest):
             "amount_usd": settings.REFERRAL_BONUS_USD,
             "credited_at": datetime.now(timezone.utc).isoformat(),
         })
+        create_notification(
+            username=user["referred_by"],
+            title="You earned a referral bonus!",
+            message=f"{user['username']} just verified their account using your referral link — you earned ${settings.REFERRAL_BONUS_USD}.",
+            category="referral",
+        )
     return {"detail": "Account verified — you can now log in."}
 
 

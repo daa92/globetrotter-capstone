@@ -203,3 +203,30 @@ class PayoutRequestResult(BaseModel):
     amount_fcfa: float
     status: str
     requested_at: str
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+
+class NotificationOut(BaseModel):
+    id: str
+    title: str
+    message: str
+    category: str
+    is_read: bool
+    sent_by: str
+    created_at: str
+
+
+class NotificationBatchAction(BaseModel):
+    ids: Optional[list[str]] = Field(default=None, description="Specific notification IDs")
+    all: bool = Field(default=False, description="Apply to every one of your notifications")
+
+
+class AdminSendNotificationRequest(BaseModel):
+    usernames: Optional[list[str]] = Field(default=None, description="Target usernames; omit if broadcast=true")
+    broadcast: bool = Field(default=False, description="Send to every user instead of specific usernames")
+    title: str = Field(min_length=1, max_length=150)
+    message: str = Field(min_length=1, max_length=2000)
+    also_email: bool = Field(default=False, description="Also send via email if the user has one on file")

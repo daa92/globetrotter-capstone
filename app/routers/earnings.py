@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app import storage
 from app.config import settings
 from app.dependencies import get_current_admin, get_current_user
+from app.notifications.service import create_notification
 from app.schemas import (
     DailyActivity,
     EarningsResponse,
@@ -191,15 +192,31 @@ def list_payouts(status_filter: str = "pending", admin: dict = Depends(get_curre
 
 @router.post("/admin/payouts/{payout_id}/approve")
 def approve_payout(payout_id: str, admin: dict = Depends(get_current_admin)):
-    updated = storage.update_one(storage.PAYOUTS_FILE, "id", payout_id, {"status": "approved"})
-    if not updated:
+    payouts = storage.read_all(storage.PAYOUTS_FILE)
+    payout = next((p for p in payouts if p["id"] == payout_id), None)
+    if not payout:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Payout request not found")
+    storage.update_one(storage.PAYOUTS_FILE, "id", payout_id, {"status": "approved"})
+    create_notification(
+        username=payout["username"],
+        title="Payout approved",
+        message=f"Your payout request for ${payout['amount_usd']} has been approved.",
+        category="payout",
+    )
     return {"detail": "Payout approved"}
 
 
 @router.post("/admin/payouts/{payout_id}/reject")
 def reject_payout(payout_id: str, admin: dict = Depends(get_current_admin)):
-    updated = storage.update_one(storage.PAYOUTS_FILE, "id", payout_id, {"status": "rejected"})
-    if not updated:
+    payouts = storage.read_all(storage.PAYOUTS_FILE)
+    payout = next((p for p in payouts if p["id"] == payout_id), None)
+    if not payout:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Payout request not found")
+    storage.update_one(storage.PAYOUTS_FILE, "id", payout_id, {"status": "rejected"})
+    create_notification(
+        username=payout["username"],
+        title="Payout request rejected",
+        message=f"Your payout request for ${payout['amount_usd']} was rejected. Contact support for details.",
+        category="payout",
+    )
     return {"detail": "Payout rejected"}
