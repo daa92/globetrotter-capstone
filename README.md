@@ -66,6 +66,7 @@ circuit breakers, tracing).
 | POST | `/auth/register` | No | Create an account (unverified — deleted after 30 min if not verified) |
 | POST | `/auth/verify` | No | Verify a new account with the token sent at registration |
 | POST | `/auth/login` | No | Login (requires a verified account); returns tokens, or an MFA challenge if enabled |
+| POST | `/auth/google` | No | Sign in/register via Google ID token (see "Google Sign-In" below) |
 | POST | `/auth/mfa/setup` | Yes | Generate a TOTP secret + QR provisioning URI |
 | POST | `/auth/mfa/confirm` | Yes | Confirm a TOTP code, enabling MFA |
 | POST | `/auth/mfa/disable` | Yes | Disable MFA |
@@ -325,6 +326,43 @@ python testing/simulation/chaos_probe.py --host http://localhost:8000
 
 Neither tool is imported by app code or included in the production Docker
 image — verified via `.dockerignore` and the separate `Dockerfile`.
+
+## Google Sign-In
+
+`POST /auth/google` accepts `{"id_token": "..."}` — the credential Google's
+"Sign In With Google" button hands your frontend after the user clicks and
+agrees. No redirect, no server-side code exchange, and **no Client Secret
+needed** — verification is just a signature/audience check against
+Google's public keys (see `app/google_oauth.py`).
+
+Setup:
+1. Create a free Google Cloud project and OAuth Client ID (Web application
+   type, no billing account needed) — full walkthrough available on
+   request, or see [Google's guide](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid).
+2. Set `GOOGLE_CLIENT_ID` in `.env`. Leaving it blank makes the endpoint
+   return a clear `501` rather than trying and failing.
+3. On the frontend, render Google's Sign-In button (loads `accounts.google.com`'s
+   script), which calls back with the credential — POST that straight to
+   `/auth/google`.
+
+Behavior:
+- **New Google sign-in, no matching account** → creates one, auto-verified
+  (Google already confirmed the email, so the 30-minute verification
+  window doesn't apply), with a username derived from the email's local
+  part (a numeric suffix is appended on collision, e.g. `alice` → `alice1`).
+- **Google sign-in matching an existing account's email** → logs into that
+  same account and links it (no duplicate accounts by email).
+- **That account has MFA enabled** → same challenge/response pattern as
+  password login: first call returns `{"mfa_required": true}`, retry with
+  `mfa_code` included.
+- **A Google-only account (no local password set) tries `/auth/login`
+  with a password** → rejected with the same generic "invalid username or
+  password" as any other wrong attempt — never reveals that the account
+  exists or how it was created.
+- A network failure reaching Google (rare, but real) returns `503`, kept
+  distinct from a genuinely invalid/expired token (`401`) — verified this
+  by actually triggering the real verification path against Google's live
+  endpoint and confirming the error type.
 
 ## Notifications
 

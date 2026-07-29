@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     # Used to build referral links (see /users/me/earnings -> referral_link)
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # --- Google Sign-In ---
+    # Only the Client ID is needed — we verify the ID token Google's button
+    # hands the frontend directly (signature check against Google's public
+    # keys), which never requires the Client Secret. Leaving this empty
+    # disables the /auth/google endpoint with a clear error rather than
+    # crashing.
+    GOOGLE_CLIENT_ID: str = ""
+
     # --- CORS (tighten in production to your real frontend origins) ---
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",

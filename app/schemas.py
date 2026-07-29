@@ -58,6 +58,11 @@ class MFALoginChallenge(BaseModel):
     username: str
 
 
+class GoogleAuthRequest(BaseModel):
+    id_token: str = Field(description="The credential/ID token from Google's Sign In button")
+    mfa_code: Optional[str] = Field(default=None, description="Required only if the linked account has MFA enabled")
+
+
 # ---------------------------------------------------------------------------
 # Users / profile
 # ---------------------------------------------------------------------------

@@ -14,18 +14,22 @@ Auth flow:
   6. POST /auth/refresh             -> read refresh cookie -> new access token
   7. POST /auth/logout              -> clear refresh cookie
 """
+import re
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from google.auth.exceptions import GoogleAuthError
 from jose import JWTError
 
 from app import security, storage
 from app.config import settings
 from app.dependencies import get_current_user
+from app.google_oauth import verify_google_id_token
 from app.notifications import outbox
 from app.notifications.service import create_notification
 from app.schemas import (
+    GoogleAuthRequest,
     MFAConfirmRequest,
     MFALoginChallenge,
     MFASetupResponse,
@@ -83,6 +87,7 @@ def register(payload: UserRegister):
         "verification_token": verification_token,
         "referral_code": uuid.uuid4().hex[:8].upper(),
         "referred_by": sponsor["username"] if sponsor else None,
+        "google_sub": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     storage.append(storage.USERS_FILE, user)
@@ -138,7 +143,11 @@ def verify_account(payload: VerifyRequest):
 def _authenticate(username: str, password: str) -> dict:
     users = storage.read_all(storage.USERS_FILE)
     user = next((u for u in users if u["username"] == username), None)
-    if not user or not security.verify_password(password, user["hashed_password"]):
+    # A Google-only account (created via /auth/google, never set a local
+    # password) has hashed_password=None. Treat that the same as a wrong
+    # password — a generic "invalid credentials" message, so this endpoint
+    # never confirms/denies whether an account exists or how it was created.
+    if not user or not user.get("hashed_password") or not security.verify_password(password, user["hashed_password"]):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid username or password")
     return user
 
@@ -224,3 +233,82 @@ def refresh(
 def logout(response: Response):
     response.delete_cookie(settings.COOKIE_NAME_REFRESH, path="/auth")
     return {"detail": "Logged out"}
+
+
+def _generate_username_from_email(email: str, existing_users: list[dict]) -> str:
+    """Derives a username candidate from the email's local part, sanitized
+    to fit our username pattern, with a numeric suffix if it collides."""
+    base = re.sub(r"[^a-zA-Z0-9_.-]", "", email.split("@")[0]) or "user"
+    existing_usernames = {u["username"] for u in existing_users}
+    candidate = base
+    suffix = 1
+    while candidate in existing_usernames:
+        candidate = f"{base}{suffix}"
+        suffix += 1
+    return candidate
+
+
+@router.post("/google")
+def google_login(payload: GoogleAuthRequest, response: Response):
+    """Sign in (or register, on first use) with Google. Only ever needs the
+    Client ID — verification is a signature check against Google's public
+    keys, not a secret exchange. New accounts are auto-verified (Google
+    already confirmed the email), so the 30-minute unverified-account
+    cleanup doesn't apply to them."""
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "Google sign-in is not configured on this server")
+
+    try:
+        google_payload = verify_google_id_token(payload.id_token)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"Invalid Google token: {exc}")
+    except GoogleAuthError as exc:
+        # Distinct from an invalid token: this means we couldn't even reach
+        # Google to check it (network hiccup, cert endpoint down, etc.) —
+        # worth a different status so a client/monitoring can tell "your
+        # token is bad" apart from "try again in a moment".
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, f"Could not verify with Google right now: {exc}")
+
+    if not google_payload.get("email_verified", False):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Google account email is not verified")
+
+    email = google_payload["email"]
+    google_sub = google_payload["sub"]
+
+    users = storage.read_all(storage.USERS_FILE)
+    user = next((u for u in users if u["email"] == email), None)
+
+    if user is None:
+        username = _generate_username_from_email(email, users)
+        user = {
+            "username": username,
+            "email": email,
+            "hashed_password": None,  # Google-only account until they set a local password
+            "preferences": [],
+            "profile_picture_url": google_payload.get("picture"),
+            "mfa_enabled": False,
+            "mfa_secret": None,
+            "is_admin": False,
+            "is_verified": True,  # Google already verified this email
+            "verification_token": None,
+            "referral_code": uuid.uuid4().hex[:8].upper(),
+            "referred_by": None,
+            "google_sub": google_sub,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        storage.append(storage.USERS_FILE, user)
+    elif not user.get("google_sub"):
+        # Existing local-password account signing in with Google for the
+        # first time, same email — link the two rather than duplicate.
+        storage.update_one(storage.USERS_FILE, "username", user["username"], {"google_sub": google_sub})
+        user["google_sub"] = google_sub
+
+    if user.get("mfa_enabled"):
+        if not payload.mfa_code:
+            return MFALoginChallenge(username=user["username"])
+        if not security.verify_mfa_code(user["mfa_secret"], payload.mfa_code):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid MFA code")
+
+    access_token = security.create_access_token(user["username"])
+    _set_refresh_cookie(response, user["username"])
+    return TokenResponse(access_token=access_token, expires_in_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
