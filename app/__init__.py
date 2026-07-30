@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.cleanup import run_cleanup_loop
 from app.config import settings
-from app.routers import auth, destinations, earnings, feedback, itineraries, notifications, places, recommendations, users
+from app.routers import auth, destinations, earnings, feedback, geo, itineraries, notifications, places, recommendations, users
 
 
 @asynccontextmanager
@@ -56,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(feedback.router)
     app.include_router(earnings.router)
     app.include_router(notifications.router)
+    app.include_router(geo.router)
 
     @app.get("/health", tags=["meta"])
     def health():

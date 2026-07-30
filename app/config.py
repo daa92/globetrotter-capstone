@@ -68,6 +68,24 @@ class Settings(BaseSettings):
     # crashing.
     GOOGLE_CLIENT_ID: str = ""
 
+    # --- Free map/geo stack (Cameroon-scoped) ---
+    # Nominatim and Overpass need no API key at all, but Nominatim's usage
+    # policy caps requests at 1/second and expects a real identifying
+    # User-Agent — set GEO_USER_AGENT to something with a real contact
+    # before deploying. OpenRouteService needs a free API key (2,000
+    # requests/day free tier) — sign up at openrouteservice.org.
+    NOMINATIM_BASE_URL: str = "https://nominatim.openstreetmap.org"
+    OVERPASS_BASE_URL: str = "https://overpass-api.de/api/interpreter"
+    OPENROUTESERVICE_BASE_URL: str = "https://api.openrouteservice.org"
+    OPENROUTESERVICE_API_KEY: str = ""
+    GEO_USER_AGENT: str = "GT-GlobeTrotter/0.1 (contact: set-a-real-contact-email@example.com)"
+    # Nominatim viewbox format: left,top,right,bottom (min_lon,max_lat,max_lon,min_lat)
+    CAMEROON_VIEWBOX: str = "8.3,13.1,16.2,1.6"
+    # How long a cached geo result is considered fresh before we hit the
+    # live API again — keeps us well under every service's rate limits
+    # while still updating "frequently enough" for a Cameroon-scoped app.
+    GEO_CACHE_TTL_HOURS: int = 168  # 7 days
+
     # --- CORS (tighten in production to your real frontend origins) ---
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",

@@ -31,6 +31,7 @@ ACTIVITY_FILE = os.path.join(DATA_DIR, "activity.json")
 REFERRALS_FILE = os.path.join(DATA_DIR, "referrals.json")
 PAYOUTS_FILE = os.path.join(DATA_DIR, "payouts.json")
 NOTIFICATIONS_FILE = os.path.join(DATA_DIR, "notifications.json")
+GEO_CACHE_FILE = os.path.join(DATA_DIR, "geo_cache.json")
 
 _lock = threading.Lock()
 

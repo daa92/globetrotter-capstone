@@ -30,6 +30,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "REFERRALS_FILE", str(data_dir / "referrals.json"))
     monkeypatch.setattr(storage, "PAYOUTS_FILE", str(data_dir / "payouts.json"))
     monkeypatch.setattr(storage, "NOTIFICATIONS_FILE", str(data_dir / "notifications.json"))
+    monkeypatch.setattr(storage, "GEO_CACHE_FILE", str(data_dir / "geo_cache.json"))
 
     seed = [
         {

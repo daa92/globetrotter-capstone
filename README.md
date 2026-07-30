@@ -103,6 +103,9 @@ circuit breakers, tracing).
 | DELETE | `/notifications/{id}` | Yes | Delete a single notification |
 | POST | `/notifications/delete` | Yes | Bulk delete: `{"ids": [...]}` or `{"all": true}` |
 | POST | `/admin/notifications/send` | Admin | Push a notification to specific users or `broadcast: true` for everyone; `also_email: true` to also email |
+| GET | `/geo/search` | No | Search Cameroon places (Nominatim, cached 7 days) |
+| GET | `/geo/route` | No | Walking/driving/cycling distance+duration (OpenRouteService, cached) |
+| GET | `/geo/poi` | No | Nearby points of interest — restaurants, hospitals, etc. (Overpass, cached) |
 | GET | `/health` | No | Liveness probe |
 
 Interactive docs (auto-generated): `http://localhost:8000/docs`
@@ -390,6 +393,37 @@ Behavior:
   distinct from a genuinely invalid/expired token (`401`) — verified this
   by actually triggering the real verification path against Google's live
   endpoint and confirming the error type.
+
+## Free map/geo layer (Cameroon-scoped)
+
+Three free services, no billing account needed anywhere:
+
+| Need | Service | Notes |
+|---|---|---|
+| Place search | Nominatim | No API key. Hard 1 req/sec policy + requires a real identifying User-Agent — set `GEO_USER_AGENT` in `.env` before deploying |
+| Points of interest | Overpass API | No API key |
+| Walking/driving directions | OpenRouteService | Free API key required, 2,000 requests/day — sign up at [openrouteservice.org](https://openrouteservice.org) |
+
+All three are wrapped in `app/geo_service.py` with a shared cache
+(`data/geo_cache.json`, 7-day TTL by default via `GEO_CACHE_TTL_HOURS`) —
+this isn't optional politeness, it's how we stay comfortably under every
+one of these services' rate limits while still refreshing data "frequently
+enough" for a Cameroon-scoped app. Every response includes `"cached":
+true/false` so you can see at a glance whether a request hit the live API.
+
+`GET /geo/route` returns `501` if `OPENROUTESERVICE_API_KEY` isn't set in
+`.env` — same "fail clearly rather than silently" pattern as Google
+Sign-In. A genuine network failure reaching any of the three services
+returns `503`, distinct from a client error (`422` for bad input).
+
+**Note on this being a naming trap I actually hit**: the utility module is
+named `geo_service.py`, not `geo.py`, on purpose — `app/routers/geo.py`
+(the router) and a same-named `app/geo.py` (the utility module) collide on
+Python's package attribute namespace once both get imported in
+`app/__init__.py`, silently making `app.geo` resolve to the *router*
+instead of the utility module in some contexts (caught this via a failing
+test, not by inspection — worth remembering if you ever add a new
+top-level module whose name matches an existing router's filename).
 
 ## Notifications
 
