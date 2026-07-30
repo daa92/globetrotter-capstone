@@ -84,6 +84,56 @@ def auth_verify(token: str = typer.Argument(..., help="Verification token from y
     console.print("[bold green]Account verified.[/bold green] You can now `gt auth login`.")
 
 
+@auth_app.command("register-phone")
+def auth_register_phone(
+    username: str = typer.Option(..., prompt=True),
+    phone: str = typer.Option(..., prompt=True, help="e.g. +237650000000"),
+    password: str = typer.Option(..., prompt=True, hide_input=True, confirmation_prompt=True),
+    preferences: str = typer.Option("", help="Comma-separated tags, e.g. beach,hiking"),
+    referral_code: Optional[str] = typer.Option(None, help="Referral code of the user who invited you, if any"),
+):
+    """Create a new GT account with a phone number instead of email."""
+    client = GTClient()
+    prefs = [p.strip() for p in preferences.split(",") if p.strip()]
+    try:
+        client.register_phone(username, phone, password, prefs, referral_code=referral_code)
+    except GTApiError as exc:
+        _handle_error(exc)
+        return
+    console.print(
+        f"[bold green]Account created for {username}.[/bold green] "
+        "Check your SMS for a verification code, then run `gt auth verify <code>` "
+        "within 30 minutes — unverified accounts are automatically deleted."
+    )
+
+
+@auth_app.command("password-reset-request")
+def auth_password_reset_request(username: str = typer.Option(..., prompt=True)):
+    """Request a password reset code (sent via SMS or email, whichever the account has)."""
+    client = GTClient()
+    try:
+        result = client.request_password_reset(username)
+    except GTApiError as exc:
+        _handle_error(exc)
+        return
+    console.print(result["detail"])
+
+
+@auth_app.command("password-reset-confirm")
+def auth_password_reset_confirm(
+    token: str = typer.Argument(..., help="Reset code you received"),
+    new_password: str = typer.Option(..., prompt=True, hide_input=True, confirmation_prompt=True),
+):
+    """Confirm a password reset with the code you received."""
+    client = GTClient()
+    try:
+        result = client.confirm_password_reset(token, new_password)
+    except GTApiError as exc:
+        _handle_error(exc)
+        return
+    console.print(f"[bold green]{result['detail']}[/bold green]")
+
+
 @auth_app.command("login")
 def auth_login(
     username: str = typer.Option(..., prompt=True),

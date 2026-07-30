@@ -16,7 +16,7 @@ Auth flow:
 """
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from google.auth.exceptions import GoogleAuthError
@@ -33,6 +33,10 @@ from app.schemas import (
     MFAConfirmRequest,
     MFALoginChallenge,
     MFASetupResponse,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    PhoneRegister,
+    PhoneRegisterResponse,
     RegisterResponse,
     TokenResponse,
     UserLogin,
@@ -56,6 +60,18 @@ def _set_refresh_cookie(response: Response, username: str) -> None:
     )
 
 
+def _resolve_sponsor(users: list[dict], referral_code: str | None, new_username: str) -> dict | None:
+    if not referral_code:
+        return None
+    sponsor = next((u for u in users if u["referral_code"] == referral_code), None)
+    if not sponsor:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid referral code")
+    # No separate "can't refer yourself" check needed — the caller's
+    # username-uniqueness check already guarantees new_username can't
+    # match an existing user's (the sponsor's) username.
+    return sponsor
+
+
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: UserRegister):
     users = storage.read_all(storage.USERS_FILE)
@@ -64,19 +80,13 @@ def register(payload: UserRegister):
     if any(u["email"] == payload.email for u in users):
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
 
-    sponsor = None
-    if payload.referral_code:
-        sponsor = next((u for u in users if u["referral_code"] == payload.referral_code), None)
-        if not sponsor:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid referral code")
-        # Note: no separate "can't refer yourself" check needed here — the
-        # username-uniqueness check above already guarantees payload.username
-        # can't match an existing user's (the sponsor's) username.
+    sponsor = _resolve_sponsor(users, payload.referral_code, payload.username)
 
     verification_token = str(uuid.uuid4())
     user = {
         "username": payload.username,
         "email": payload.email,
+        "phone": None,
         "hashed_password": security.hash_password(payload.password),
         "preferences": payload.preferences,
         "profile_picture_url": None,
@@ -88,6 +98,8 @@ def register(payload: UserRegister):
         "referral_code": uuid.uuid4().hex[:8].upper(),
         "referred_by": sponsor["username"] if sponsor else None,
         "google_sub": None,
+        "password_reset_token": None,
+        "password_reset_expires_at": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     storage.append(storage.USERS_FILE, user)
@@ -105,6 +117,56 @@ def register(payload: UserRegister):
     )
 
     return RegisterResponse(**user)
+
+
+@router.post("/register/phone", response_model=PhoneRegisterResponse, status_code=status.HTTP_201_CREATED)
+def register_phone(payload: PhoneRegister):
+    """Register with phone + pseudo + password instead of email — same
+    verification/cleanup rules apply, just delivered via SMS instead of
+    email (see app/notifications/outbox.py; /auth/verify itself is
+    channel-agnostic, so no changes were needed there)."""
+    users = storage.read_all(storage.USERS_FILE)
+    if any(u["username"] == payload.username for u in users):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Username already taken")
+    if any(u.get("phone") == payload.phone for u in users):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Phone number already registered")
+
+    sponsor = _resolve_sponsor(users, payload.referral_code, payload.username)
+
+    verification_token = str(uuid.uuid4())
+    user = {
+        "username": payload.username,
+        "email": None,
+        "phone": payload.phone,
+        "hashed_password": security.hash_password(payload.password),
+        "preferences": payload.preferences,
+        "profile_picture_url": None,
+        "mfa_enabled": False,
+        "mfa_secret": None,
+        "is_admin": False,
+        "is_verified": False,
+        "verification_token": verification_token,
+        "referral_code": uuid.uuid4().hex[:8].upper(),
+        "referred_by": sponsor["username"] if sponsor else None,
+        "google_sub": None,
+        "password_reset_token": None,
+        "password_reset_expires_at": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    storage.append(storage.USERS_FILE, user)
+
+    outbox.send(
+        to=payload.phone,
+        channel="sms",
+        subject="Verify your GT account",
+        body=(
+            f"Welcome to GT! Verify your account within "
+            f"{settings.UNVERIFIED_ACCOUNT_TTL_MINUTES} minutes using this code: "
+            f"{verification_token}"
+        ),
+    )
+
+    return PhoneRegisterResponse(**user)
 
 
 @router.post("/verify")
@@ -235,6 +297,67 @@ def logout(response: Response):
     return {"detail": "Logged out"}
 
 
+@router.post("/password-reset/request")
+def request_password_reset(payload: PasswordResetRequest):
+    """Always returns the same generic response whether or not the username
+    exists — never let this endpoint be used to enumerate accounts."""
+    users = storage.read_all(storage.USERS_FILE)
+    user = next((u for u in users if u["username"] == payload.username), None)
+    generic_response = {"detail": "If that account exists, a password reset code has been sent."}
+
+    if not user:
+        return generic_response
+
+    reset_token = str(uuid.uuid4())
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.PASSWORD_RESET_TOKEN_TTL_MINUTES)
+    storage.update_one(
+        storage.USERS_FILE, "username", user["username"],
+        {"password_reset_token": reset_token, "password_reset_expires_at": expires_at.isoformat()},
+    )
+
+    body = (
+        f"Use this code to reset your GT password within "
+        f"{settings.PASSWORD_RESET_TOKEN_TTL_MINUTES} minutes: {reset_token}"
+    )
+    if user.get("phone"):
+        outbox.send(to=user["phone"], channel="sms", subject="Reset your GT password", body=body)
+    elif user.get("email"):
+        outbox.send(to=user["email"], channel="email", subject="Reset your GT password", body=body)
+    # A user with neither on file (shouldn't happen given registration
+    # requires one or the other) simply can't be reached — the generic
+    # response is still returned either way, so this never leaks that detail.
+
+    return generic_response
+
+
+@router.post("/password-reset/confirm")
+def confirm_password_reset(payload: PasswordResetConfirm):
+    users = storage.read_all(storage.USERS_FILE)
+    user = next((u for u in users if u.get("password_reset_token") == payload.token), None)
+    if not user:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or already-used reset code")
+
+    expires_at = user.get("password_reset_expires_at")
+    if not expires_at or datetime.now(timezone.utc) > datetime.fromisoformat(expires_at):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This reset code has expired — request a new one")
+
+    storage.update_one(
+        storage.USERS_FILE, "username", user["username"],
+        {
+            "hashed_password": security.hash_password(payload.new_password),
+            "password_reset_token": None,
+            "password_reset_expires_at": None,
+        },
+    )
+    create_notification(
+        username=user["username"],
+        title="Your password was changed",
+        message="Your GT password was just reset. If this wasn't you, contact support immediately.",
+        category="security",
+    )
+    return {"detail": "Password updated — you can now log in with your new password."}
+
+
 def _generate_username_from_email(email: str, existing_users: list[dict]) -> str:
     """Derives a username candidate from the email's local part, sanitized
     to fit our username pattern, with a numeric suffix if it collides."""
@@ -283,6 +406,7 @@ def google_login(payload: GoogleAuthRequest, response: Response):
         user = {
             "username": username,
             "email": email,
+            "phone": None,
             "hashed_password": None,  # Google-only account until they set a local password
             "preferences": [],
             "profile_picture_url": google_payload.get("picture"),
@@ -294,6 +418,8 @@ def google_login(payload: GoogleAuthRequest, response: Response):
             "referral_code": uuid.uuid4().hex[:8].upper(),
             "referred_by": None,
             "google_sub": google_sub,
+            "password_reset_token": None,
+            "password_reset_expires_at": None,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         storage.append(storage.USERS_FILE, user)

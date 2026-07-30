@@ -103,6 +103,18 @@ class GTClient:
             payload["referral_code"] = referral_code
         return self._request("POST", "/auth/register", json=payload)
 
+    def register_phone(self, username: str, phone: str, password: str, preferences: list[str], referral_code: Optional[str] = None) -> dict:
+        payload = {"username": username, "phone": phone, "password": password, "preferences": preferences}
+        if referral_code:
+            payload["referral_code"] = referral_code
+        return self._request("POST", "/auth/register/phone", json=payload)
+
+    def request_password_reset(self, username: str) -> dict:
+        return self._request("POST", "/auth/password-reset/request", json={"username": username})
+
+    def confirm_password_reset(self, token: str, new_password: str) -> dict:
+        return self._request("POST", "/auth/password-reset/confirm", json={"token": token, "new_password": new_password})
+
     def verify(self, token: str) -> dict:
         return self._request("POST", "/auth/verify", json={"token": token})
 

@@ -64,9 +64,12 @@ circuit breakers, tracing).
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | POST | `/auth/register` | No | Create an account (unverified — deleted after 30 min if not verified) |
-| POST | `/auth/verify` | No | Verify a new account with the token sent at registration |
+| POST | `/auth/register/phone` | No | Register with phone + pseudo + password instead of email |
+| POST | `/auth/verify` | No | Verify a new account with the token/code sent at registration (email or SMS) |
 | POST | `/auth/login` | No | Login (requires a verified account); returns tokens, or an MFA challenge if enabled |
 | POST | `/auth/google` | No | Sign in/register via Google ID token (see "Google Sign-In" below) |
+| POST | `/auth/password-reset/request` | No | Request a reset code (sent via SMS or email, whichever the account has) |
+| POST | `/auth/password-reset/confirm` | No | Confirm with the code + a new password |
 | POST | `/auth/mfa/setup` | Yes | Generate a TOTP secret + QR provisioning URI |
 | POST | `/auth/mfa/confirm` | Yes | Confirm a TOTP code, enabling MFA |
 | POST | `/auth/mfa/disable` | Yes | Disable MFA |
@@ -326,6 +329,30 @@ python testing/simulation/chaos_probe.py --host http://localhost:8000
 
 Neither tool is imported by app code or included in the production Docker
 image — verified via `.dockerignore` and the separate `Dockerfile`.
+
+## Phone registration & password recovery
+
+`POST /auth/register/phone` is the phone + pseudo + password alternative
+to email registration — same unverified-account rules apply (30-minute
+cleanup, same `/auth/verify` endpoint, since verification is
+channel-agnostic and just matches a token regardless of how it was sent).
+The only difference is the verification code arrives via SMS (logged to
+`data/outbox.json` in dev, same as email — see "Account verification"
+above) instead of email.
+
+Password recovery (`/auth/password-reset/request` + `/auth/password-reset/confirm`)
+works for **any** account type — email, phone, or Google:
+- **Request** takes just a `username` and always returns the same generic
+  response whether or not that username exists, so this endpoint can't be
+  used to enumerate real accounts. If the account exists, a code is sent
+  to whatever it has on file (SMS for phone accounts, email otherwise).
+- **Confirm** takes the code + a new password, validates it hasn't expired
+  (`PASSWORD_RESET_TOKEN_TTL_MINUTES`, default 30), and updates the
+  password. A "your password was changed" notification fires afterward
+  (category `security`) so a legitimate user notices if this wasn't them.
+- **A Google-only account** (no local password set) can go through this
+  same flow to set a local password for the first time — a useful side
+  effect of reusing one mechanism rather than building a separate one.
 
 ## Google Sign-In
 

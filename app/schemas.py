@@ -10,6 +10,14 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
+def _check_password_strength(v: str) -> str:
+    if not any(c.isdigit() for c in v):
+        raise ValueError("Password must contain at least one digit")
+    if not any(c.isalpha() for c in v):
+        raise ValueError("Password must contain at least one letter")
+    return v
+
+
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
@@ -24,11 +32,20 @@ class UserRegister(BaseModel):
     @field_validator("password")
     @classmethod
     def password_strength(cls, v: str) -> str:
-        if not any(c.isdigit() for c in v):
-            raise ValueError("Password must contain at least one digit")
-        if not any(c.isalpha() for c in v):
-            raise ValueError("Password must contain at least one letter")
-        return v
+        return _check_password_strength(v)
+
+
+class PhoneRegister(BaseModel):
+    username: str = Field(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_.-]+$", description="Your pseudo/display name")
+    phone: str = Field(pattern=r"^\+?\d{8,15}$", description="e.g. +237650000000")
+    password: str = Field(min_length=8, max_length=128)
+    preferences: list[str] = Field(default_factory=list)
+    referral_code: Optional[str] = Field(default=None)
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _check_password_strength(v)
 
 
 class UserLogin(BaseModel):
@@ -69,7 +86,8 @@ class GoogleAuthRequest(BaseModel):
 
 class UserPublic(BaseModel):
     username: str
-    email: EmailStr
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
     preferences: list[str] = Field(default_factory=list)
     profile_picture_url: Optional[str] = None
     mfa_enabled: bool = False
@@ -82,8 +100,26 @@ class VerifyRequest(BaseModel):
     token: str
 
 
+class PasswordResetRequest(BaseModel):
+    username: str
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _check_password_strength(v)
+
+
 class RegisterResponse(UserPublic):
     detail: str = "Account created. Check your email for a verification link — it expires in 30 minutes."
+
+
+class PhoneRegisterResponse(UserPublic):
+    detail: str = "Account created. Check your SMS for a verification code — it expires in 30 minutes."
 
 
 class UserProfileUpdate(BaseModel):

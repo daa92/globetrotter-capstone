@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     UNVERIFIED_ACCOUNT_TTL_MINUTES: int = 30
     VERIFICATION_CLEANUP_INTERVAL_SECONDS: int = 60
 
+    # --- Password recovery ---
+    PASSWORD_RESET_TOKEN_TTL_MINUTES: int = 30
+
     # --- Earnings: daily usage reward ---
     DAILY_USAGE_THRESHOLD_SECONDS: int = 300  # 5 minutes
     DAILY_USAGE_BONUS_USD: float = 0.5
