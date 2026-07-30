@@ -17,6 +17,11 @@ data/users.json
 data/itineraries.json
 data/places.json
 data/feedback.json
+data/outbox.json
+data/activity.json
+data/referrals.json
+data/payouts.json
+data/notifications.json
 
 # Test / coverage
 .pytest_cache/
