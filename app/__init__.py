@@ -6,6 +6,7 @@ is wiring — middleware, routers, background tasks, and the health check.
 Business logic always lives in routers/, never here.
 """
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,6 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.cleanup import run_cleanup_loop
 from app.config import settings
 from app.routers import auth, destinations, earnings, feedback, geo, itineraries, notifications, places, recommendations, users
+
+logger = logging.getLogger("gt.app")
 
 
 @asynccontextmanager
@@ -57,6 +60,15 @@ def create_app() -> FastAPI:
     app.include_router(earnings.router)
     app.include_router(notifications.router)
     app.include_router(geo.router)
+
+    if settings.SIMULATION_MODE:
+        from app.routers import debug_challenges
+        app.include_router(debug_challenges.router)
+        logger.warning(
+            "SIMULATION_MODE is ON — /debug/challenges/* endpoints are live. "
+            "These exist ONLY to prove capstone failure-mode challenges on "
+            "demand. NEVER set SIMULATION_MODE=true in production."
+        )
 
     @app.get("/health", tags=["meta"])
     def health():

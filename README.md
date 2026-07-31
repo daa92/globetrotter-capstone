@@ -51,6 +51,7 @@ circuit breakers, tracing).
 │   └── feedback.json         # runtime data, gitignored
 ├── tests/                    # pytest — unit/integration tests
 ├── testing/simulation/       # Locust load-test + chaos probe (dev-only, never shipped)
+├── testing/challenges/       # Proof scripts for the capstone slide challenges (dev-only)
 ├── cli/                      # `gt` command-line client (separate installable package)
 ├── Dockerfile                # production image (lean, no dev/test deps)
 ├── Dockerfile.dev             # dev image (hot reload, includes dev deps)
@@ -332,6 +333,22 @@ python testing/simulation/chaos_probe.py --host http://localhost:8000
 
 Neither tool is imported by app code or included in the production Docker
 image — verified via `.dockerignore` and the separate `Dockerfile`.
+
+## Proving the monolith's known challenges
+
+See [`testing/challenges/README.md`](testing/challenges/README.md) for
+runnable scripts that *prove* — not just claim — the Phase 1 monolith
+limitations: lost/corrupted writes under concurrent JSON access, latency
+that grows with load instead of scaling, one slow request degrading
+totally unrelated endpoints, a single redeploy taking the whole app
+offline, real git merge conflicts from shared-codebase development, and
+why services can't be tested in isolation here.
+
+One of these (`prove_no_isolation_challenge.py`) needs `SIMULATION_MODE=true`
+in `.env` — this flag exists for exactly this purpose (see
+`app/routers/debug_challenges.py`) and is `false` by default. **Never set
+it to `true` in production** — it exposes an endpoint that deliberately
+blocks the server for demonstration purposes.
 
 ## Phone registration & password recovery
 
