@@ -132,26 +132,103 @@ def get_route(start_lat: float, start_lng: float, end_lat: float, end_lng: float
 
 # ---------------------------------------------------------------------------
 # Overpass — points of interest (restaurants, hospitals, fuel, etc.)
+#
+# OpenStreetMap doesn't tag everything under "amenity" — a restaurant is
+# amenity=restaurant, but a hotel is tourism=hotel, an airport is
+# aeroway=aerodrome, and a supermarket is shop=supermarket. Treating
+# every category as "amenity=X" (an earlier version of this file did)
+# silently returns zero results for anything not actually an amenity —
+# not an error, just an empty list, which looks like "no results" rather
+# than "wrong tag", making it an easy bug to miss. CATEGORY_TAGS is the
+# single place that maps a friendly category name to its real OSM key.
 # ---------------------------------------------------------------------------
 
-def _fetch_overpass_pois(amenity: str, lat: float, lon: float, radius_m: int) -> list[dict]:
+CATEGORY_TAGS: dict[str, tuple[str, str]] = {
+    "restaurant": ("amenity", "restaurant"),
+    "fast_food": ("amenity", "fast_food"),
+    "cafe": ("amenity", "cafe"),
+    "bar": ("amenity", "bar"),
+    "hospital": ("amenity", "hospital"),
+    "pharmacy": ("amenity", "pharmacy"),
+    "bank": ("amenity", "bank"),
+    "atm": ("amenity", "atm"),
+    "fuel": ("amenity", "fuel"),
+    "school": ("amenity", "school"),
+    "cinema": ("amenity", "cinema"),
+    "nightclub": ("amenity", "nightclub"),
+    "hotel": ("tourism", "hotel"),
+    "guest_house": ("tourism", "guest_house"),
+    "airport": ("aeroway", "aerodrome"),
+    "supermarket": ("shop", "supermarket"),
+    "market": ("amenity", "marketplace"),
+}
+
+
+def _fetch_overpass_pois(category: str, lat: float, lon: float, radius_m: int) -> list[dict]:
+    tag_key, tag_value = CATEGORY_TAGS[category]
     query = f"""
     [out:json][timeout:25];
-    node["amenity"="{amenity}"](around:{radius_m},{lat},{lon});
-    out body;
+    (
+      node["{tag_key}"="{tag_value}"](around:{radius_m},{lat},{lon});
+      way["{tag_key}"="{tag_value}"](around:{radius_m},{lat},{lon});
+    );
+    out center body;
     """
     resp = httpx.post(settings.OVERPASS_BASE_URL, data={"data": query}, timeout=30)
     resp.raise_for_status()
-    return [
-        {
-            "name": el.get("tags", {}).get("name", "Unnamed"),
-            "latitude": el["lat"],
-            "longitude": el["lon"],
-            "amenity": amenity,
-        }
-        for el in resp.json().get("elements", [])
-    ]
+    results = []
+    for el in resp.json().get("elements", []):
+        # Nodes have lat/lon directly; ways (buildings, areas) need "out center"
+        # to get a representative point instead — handled by the query above.
+        lat_val = el.get("lat") or el.get("center", {}).get("lat")
+        lon_val = el.get("lon") or el.get("center", {}).get("lon")
+        if lat_val is None or lon_val is None:
+            continue
+        tags = el.get("tags", {})
+        results.append({
+            "name": tags.get("name", "Unnamed"),
+            "latitude": lat_val,
+            "longitude": lon_val,
+            "category": category,
+            "address": ", ".join(filter(None, [tags.get("addr:street"), tags.get("addr:city")])) or None,
+            "phone": tags.get("phone") or tags.get("contact:phone"),
+            "opening_hours": tags.get("opening_hours"),
+        })
+    return results
 
 
-def search_pois(amenity: str, lat: float, lon: float, radius_m: int = 5000) -> tuple[list[dict], bool]:
-    return get_or_fetch("overpass_poi", _fetch_overpass_pois, amenity=amenity, lat=lat, lon=lon, radius_m=radius_m)
+def search_pois(category: str, lat: float, lon: float, radius_m: int = 5000) -> tuple[list[dict], bool]:
+    if category not in CATEGORY_TAGS:
+        raise ValueError(f"Unknown category '{category}'. Valid: {', '.join(CATEGORY_TAGS)}")
+    return get_or_fetch("overpass_poi", _fetch_overpass_pois, category=category, lat=lat, lon=lon, radius_m=radius_m)
+
+
+# ---------------------------------------------------------------------------
+# Wikipedia — short description + photo for "click a place, see details"
+# (used for live/OSM results, which have no curated description of their
+# own — curated destinations already have one in data/destinations.json)
+# ---------------------------------------------------------------------------
+
+def _fetch_wikipedia_summary(title: str, lang: str) -> dict | None:
+    resp = httpx.get(
+        f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}",
+        headers={"User-Agent": settings.GEO_USER_AGENT},
+        timeout=10,
+    )
+    if resp.status_code == 404:
+        return None  # no matching article — not an error, just nothing to show
+    resp.raise_for_status()
+    data = resp.json()
+    if data.get("type") == "disambiguation":
+        return None
+    return {
+        "title": data.get("title"),
+        "extract": data.get("extract"),
+        "image_url": (data.get("thumbnail") or {}).get("source"),
+        "wikipedia_url": (data.get("content_urls", {}).get("desktop") or {}).get("page"),
+    }
+
+
+def get_place_summary(name: str, lang: str = "en") -> tuple[dict | None, bool]:
+    lang = lang if lang in ("en", "fr") else "en"
+    return get_or_fetch("wikipedia_summary", _fetch_wikipedia_summary, title=name, lang=lang)

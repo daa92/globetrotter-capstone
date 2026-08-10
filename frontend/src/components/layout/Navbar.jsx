@@ -1,11 +1,19 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Navbar() {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
+  const { user, isAuthenticated, loading, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/");
+  };
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language.startsWith("fr") ? "en" : "fr");
@@ -45,12 +53,29 @@ export default function Navbar() {
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          <Link
-            to="/login"
-            className="rounded-full bg-teal-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-teal-800 transition"
-          >
-            {t("nav.login")}
-          </Link>
+          {loading ? null : isAuthenticated ? (
+            <div className="flex items-center gap-3">
+              <Link
+                to="/profile"
+                className="text-sm font-medium text-neutral-700 dark:text-neutral-200 hover:underline"
+              >
+                {user?.username}
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="rounded-full border border-neutral-300 dark:border-neutral-600 px-4 py-1.5 text-sm font-semibold text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+              >
+                {t("nav.logout")}
+              </button>
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className="rounded-full bg-teal-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-teal-800 transition"
+            >
+              {t("nav.login")}
+            </Link>
+          )}
         </div>
       </nav>
     </header>

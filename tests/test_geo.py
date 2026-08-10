@@ -144,15 +144,33 @@ def test_route_rejects_invalid_profile(client, monkeypatch):
 # POI search
 # ---------------------------------------------------------------------------
 
+def test_poi_categories_endpoint_lists_supported_categories(client):
+    resp = client.get("/geo/poi-categories")
+    assert resp.status_code == 200
+    categories = resp.json()["categories"]
+    # spot-check a few that use DIFFERENT underlying OSM tags — this is
+    # exactly the bug that was fixed: airport/hotel/supermarket aren't
+    # "amenity" tags at all, and treating them as such silently returned
+    # zero results rather than erroring.
+    for expected in ["restaurant", "fast_food", "airport", "hotel", "supermarket"]:
+        assert expected in categories
+
+
+def test_poi_search_rejects_unknown_category(client):
+    resp = client.get("/geo/poi", params={"category": "spaceship_dealership", "lat": 4.05, "lon": 9.7})
+    assert resp.status_code == 400
+    assert "unknown category" in resp.json()["detail"].lower()
+
+
 def test_poi_search_returns_results_and_caches(client, monkeypatch):
     calls = {"count": 0}
 
     def fake_pois(**kwargs):
         calls["count"] += 1
-        return [{"name": "Chez Test", "latitude": 4.05, "longitude": 9.7, "amenity": kwargs["amenity"]}]
+        return [{"name": "Chez Test", "latitude": 4.05, "longitude": 9.7, "category": kwargs["category"], "address": None, "phone": None, "opening_hours": None}]
     monkeypatch.setattr("app.geo_service._fetch_overpass_pois", fake_pois)
 
-    params = {"amenity": "restaurant", "lat": 4.05, "lon": 9.7}
+    params = {"category": "restaurant", "lat": 4.05, "lon": 9.7}
     first = client.get("/geo/poi", params=params)
     assert first.status_code == 200
     assert first.json()["results"][0]["name"] == "Chez Test"
@@ -163,10 +181,90 @@ def test_poi_search_returns_results_and_caches(client, monkeypatch):
     assert calls["count"] == 1
 
 
+def test_poi_search_works_for_a_non_amenity_category_like_airport(client, monkeypatch):
+    """The specific bug this fixes: 'airport' is aeroway=aerodrome, not
+    amenity=airport. This test would have caught the old bug — it checks
+    that the category is accepted and passed through correctly, not that
+    the (mocked) fetch itself does the right OSM query."""
+    def fake_pois(**kwargs):
+        assert kwargs["category"] == "airport"
+        return [{"name": "Yaoundé Nsimalen International Airport", "latitude": 3.72, "longitude": 11.55, "category": "airport", "address": None, "phone": None, "opening_hours": None}]
+    monkeypatch.setattr("app.geo_service._fetch_overpass_pois", fake_pois)
+
+    resp = client.get("/geo/poi", params={"category": "airport", "lat": 3.72, "lon": 11.55})
+    assert resp.status_code == 200
+    assert "Airport" in resp.json()["results"][0]["name"]
+
+
 def test_poi_search_handles_upstream_failure_as_503(client, monkeypatch):
     def failing_pois(**kwargs):
         raise ConnectionError("could not reach Overpass")
     monkeypatch.setattr("app.geo_service._fetch_overpass_pois", failing_pois)
 
-    resp = client.get("/geo/poi", params={"amenity": "hospital", "lat": 4.05, "lon": 9.7})
+    resp = client.get("/geo/poi", params={"category": "hospital", "lat": 4.05, "lon": 9.7})
     assert resp.status_code == 503
+
+
+# ---------------------------------------------------------------------------
+# Wikipedia place summary (for "click a place, see description + photo")
+# ---------------------------------------------------------------------------
+
+def test_place_summary_returns_description_and_photo(client, monkeypatch):
+    def fake_summary(**kwargs):
+        return {"title": "Mount Cameroon", "extract": "An active volcano in Cameroon.", "image_url": "https://example.com/pic.jpg", "wikipedia_url": "https://en.wikipedia.org/wiki/Mount_Cameroon"}
+    monkeypatch.setattr("app.geo_service._fetch_wikipedia_summary", fake_summary)
+
+    resp = client.get("/geo/place-summary", params={"name": "Mount Cameroon"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["found"] is True
+    assert body["extract"] == "An active volcano in Cameroon."
+    assert body["image_url"] == "https://example.com/pic.jpg"
+
+
+def test_place_summary_returns_found_false_when_no_article_exists(client, monkeypatch):
+    """No Wikipedia article for a small local place is a completely normal
+    outcome, not an error — must not be a 404."""
+    monkeypatch.setattr("app.geo_service._fetch_wikipedia_summary", lambda **kwargs: None)
+
+    resp = client.get("/geo/place-summary", params={"name": "Some Tiny Unknown Place"})
+    assert resp.status_code == 200
+    assert resp.json()["found"] is False
+
+
+def test_place_summary_caches(client, monkeypatch):
+    calls = {"count": 0}
+
+    def fake_summary(**kwargs):
+        calls["count"] += 1
+        return {"title": "Kribi", "extract": "A beach town.", "image_url": None, "wikipedia_url": None}
+    monkeypatch.setattr("app.geo_service._fetch_wikipedia_summary", fake_summary)
+
+    params = {"name": "Kribi"}
+    client.get("/geo/place-summary", params=params)
+    second = client.get("/geo/place-summary", params=params)
+    assert second.json()["cached"] is True
+    assert calls["count"] == 1
+
+
+def test_place_summary_handles_upstream_failure_as_503(client, monkeypatch):
+    def failing_summary(**kwargs):
+        raise ConnectionError("could not reach Wikipedia")
+    monkeypatch.setattr("app.geo_service._fetch_wikipedia_summary", failing_summary)
+
+    resp = client.get("/geo/place-summary", params={"name": "Douala"})
+    assert resp.status_code == 503
+
+
+def test_place_summary_rejects_unsupported_language(client, monkeypatch):
+    called = {"count": 0}
+
+    def fake_summary(**kwargs):
+        called["count"] += 1
+        return None
+    monkeypatch.setattr("app.geo_service._fetch_wikipedia_summary", fake_summary)
+
+    resp = client.get("/geo/place-summary", params={"name": "Douala", "lang": "de"})
+    assert resp.status_code == 422  # only en/fr allowed
+    assert called["count"] == 0  # never even reached the fetch function
+
