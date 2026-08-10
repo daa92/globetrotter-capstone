@@ -55,8 +55,24 @@ async function request(path, { method = "GET", body, token, params } = {}) {
     }
   }
 
-  if (!resp.ok) {
+  /*if (!resp.ok) {
     throw new ApiError(resp.status, data?.detail ?? data ?? resp.statusText);
+  }*/
+  if (!resp.ok) {
+  	let message = data?.detail ?? data ?? resp.statusText;
+  	// FastAPI validation errors (422) return `detail` as an array of
+  	// {loc, msg, type} objects, not a string — rendering that directly
+  	// as a React child crashes the whole app with no error boundary to
+  	// catch it. Normalize to one readable string here, globally.
+  	if (Array.isArray(message)) {
+    		message = message
+      		.map((e) => {
+        		const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : "field";
+        		return `${field}: ${e.msg}`;
+      		})
+      		.join("; ");
+  	}
+  	throw new ApiError(resp.status, message);
   }
   return data;
 }
