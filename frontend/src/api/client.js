@@ -27,53 +27,65 @@ export class ApiError extends Error {
 }
 
 async function request(path, { method = "GET", body, token, params } = {}) {
-  let url = `${API_URL}${path}`;
+  const url = new URL(path, API_BASE_URL || window.location.origin);
   if (params) {
-    const qs = new URLSearchParams(
-      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null))
-    ).toString();
-    if (qs) url += `?${qs}`;
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
 
-  const headers = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const resp = await fetch(url, {
-    method,
-    headers,
-    credentials: "include", // sends/receives the httpOnly gt_refresh_token cookie
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+  const headers = new Headers({
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   });
 
-  const text = await resp.text();
+  const resp = await fetch(url.toString(), {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  // Try to parse JSON, but don't crash if there's no JSON body or parsing fails.
   let data = null;
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = text;
-    }
+  try {
+    // Only attempt to parse if there is a body (some endpoints return 204 No Content)
+    const text = await resp.text();
+    data = text ? JSON.parse(text) : null;
+  } catch (e) {
+    // Keep data as null — we'll fall back to resp.statusText where needed.
   }
 
-  /*if (!resp.ok) {
-    throw new ApiError(resp.status, data?.detail ?? data ?? resp.statusText);
-  }*/
   if (!resp.ok) {
-  	let message = data?.detail ?? data ?? resp.statusText;
-  	// FastAPI validation errors (422) return `detail` as an array of
-  	// {loc, msg, type} objects, not a string — rendering that directly
-  	// as a React child crashes the whole app with no error boundary to
-  	// catch it. Normalize to one readable string here, globally.
-  	if (Array.isArray(message)) {
-    		message = message
-      		.map((e) => {
-        		const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : "field";
-        		return `${field}: ${e.msg}`;
-      		})
-      		.join("; ");
-  	}
-  	throw new ApiError(resp.status, message);
+    // Prefer explicit data.detail or data, but fall back to statusText.
+    let message = (data && (data.detail ?? data)) ?? resp.statusText ?? `HTTP ${resp.status}`;
+
+    // FastAPI validation errors (422) often return `detail` as an array of
+    // { loc, msg, type } objects. Rendering that array directly inside React
+    // can crash the app. Normalize arrays to a single readable string here.
+    if (Array.isArray(message)) {
+      message = message
+        .map((e) => {
+          const field =
+            Array.isArray(e.loc) && e.loc.length > 0
+              ? e.loc[e.loc.length - 1]
+              : e.loc ?? "field";
+          return `${field}: ${e.msg}`;
+        })
+        .join("; ");
+    } else if (typeof message === "object") {
+      // If message is an object (not an array), fallback to a concise string.
+      // Avoid printing raw objects into the UI — stringify only as last resort.
+      try {
+        message = JSON.stringify(message);
+      } catch {
+        message = resp.statusText ?? `HTTP ${resp.status}`;
+      }
+    } else {
+      // Ensure we have a string for the message
+      message = String(message);
+    }
+
+    throw new ApiError(resp.status, message);
   }
+
   return data;
 }
 
