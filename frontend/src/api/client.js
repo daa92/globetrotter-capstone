@@ -27,7 +27,7 @@ export class ApiError extends Error {
 }
 
 async function request(path, { method = "GET", body, token, params } = {}) {
-  const url = new URL(path, API_BASE_URL || window.location.origin);
+  const url = new URL(path, API_URL);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
@@ -41,6 +41,7 @@ async function request(path, { method = "GET", body, token, params } = {}) {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    credentials: "include",
   });
 
   // Try to parse JSON, but don't crash if there's no JSON body or parsing fails.
