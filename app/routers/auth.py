@@ -74,6 +74,25 @@ def _resolve_sponsor(users: list[dict], referral_code: str | None, new_username:
     return sponsor
 
 
+def _verification_email_html(username: str, token: str) -> str:
+    """Two ways to verify from the same email, since Register.jsx already
+    has a working manual-code-entry step we don't want to break:
+      1. Click the link -> frontend's /verify page reads ?token= and
+         calls POST /auth/verify itself (the new flow).
+      2. Copy the code shown below into the in-app "enter your code"
+         screen you land on right after registering.
+    """
+    link = f"{settings.FRONTEND_URL}/verify?token={token}"
+    return (
+        f"<p>Welcome to GlobeTrotter, {username}!</p>"
+        f"<p>Verify your account within {settings.UNVERIFIED_ACCOUNT_TTL_MINUTES} minutes "
+        f'by clicking here: <a href="{link}">{link}</a></p>'
+        f"<p>Or, if you're still on the sign-up screen, enter this code there: "
+        f"<strong>{token}</strong></p>"
+        f"<p>If you didn't create this account, you can ignore this email.</p>"
+    )
+
+
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: UserRegister):
     users = storage.read_all(storage.USERS_FILE)
@@ -109,13 +128,7 @@ def register(payload: UserRegister):
     outbox.send(
         to=payload.email,
         subject="Verify your GT account",
-        body=(
-            f"Welcome to GT! Verify your account within "
-            f"{settings.UNVERIFIED_ACCOUNT_TTL_MINUTES} minutes using this token: "
-            f"{verification_token}\n\n"
-            f"(In production this would be a clickable link to "
-            f"https://your-domain/verify?token={verification_token})"
-        ),
+        body=_verification_email_html(payload.username, verification_token),
     )
 
     return RegisterResponse(**user)
