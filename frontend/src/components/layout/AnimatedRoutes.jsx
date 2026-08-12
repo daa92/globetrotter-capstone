@@ -9,6 +9,15 @@ import Recommendations from "../../pages/Recommendations";
 import Itineraries from "../../pages/Itineraries";
 import Profile from "../../pages/Profile";
 import HowToUse from "../../pages/HowToUse";
+import Verify from "../../pages/Verify";
+import AdminDashboard from "../../pages/AdminDashboard";
+
+// Deliberately unlisted path — not referenced by any nav/link in the app,
+// so it's only reachable by someone who already knows it. This is
+// obscurity on top of, not instead of, the real access control: the page
+// itself checks user.is_admin, and every API call it makes is re-checked
+// server-side by get_current_admin regardless of how someone got here.
+const ADMIN_PATH = "/admin-c746b9c7d7c57420";
 
 const pageVariants = {
   initial: { opacity: 0, y: 12 },
@@ -52,6 +61,8 @@ export default function AnimatedRoutes() {
         <Route path="/itineraries" element={<Page><Itineraries /></Page>} />
         <Route path="/profile" element={<Page><Profile /></Page>} />
         <Route path="/how-to-use" element={<Page><HowToUse /></Page>} />
+        <Route path="/verify" element={<Page><Verify /></Page>} />
+        <Route path={ADMIN_PATH} element={<Page><AdminDashboard /></Page>} />
       </Routes>
     </AnimatePresence>
   );
