@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     # hard 404-equivalent (403) until explicitly configured. Set this as an
     # env var on Render, call the endpoint once, then unset/rotate it.
     ADMIN_BOOTSTRAP_SECRET: str = ""
+
+    # --- Brevo (transactional email) ---
+    # If BREVO_API_KEY is unset, outbox.send() falls back to logging to
+    # data/outbox.json instead of a real API call — keeps local dev/tests
+    # working with zero external calls or secrets.
+    BREVO_API_KEY: str = ""
+    BREVO_SENDER_EMAIL: str = ""
+    BREVO_SENDER_NAME: str = "GlobeTrotter"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
