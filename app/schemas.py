@@ -271,3 +271,8 @@ class AdminSendNotificationRequest(BaseModel):
     title: str = Field(min_length=1, max_length=150)
     message: str = Field(min_length=1, max_length=2000)
     also_email: bool = Field(default=False, description="Also send via email if the user has one on file")
+
+
+class AdminBootstrapRequest(BaseModel):
+    username: str = Field(min_length=1, description="Existing account to promote to admin")
+    secret: str = Field(min_length=1, description="Must match ADMIN_BOOTSTRAP_SECRET env var")
