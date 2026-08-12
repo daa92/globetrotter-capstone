@@ -155,3 +155,25 @@ export const markNotificationsRead = (token, body) =>
 export const deleteNotifications = (token, body) =>
   request("/notifications/delete", { method: "POST", token, body });
 export const deleteNotification = (token, id) => request(`/notifications/${id}`, { method: "DELETE", token });
+
+// ---------------------------------------------------------------------------
+// Admin (hidden dashboard — every call still enforced server-side by
+// get_current_admin; the frontend route being unlinked is just obscurity,
+// not the actual access control)
+// ---------------------------------------------------------------------------
+
+export const bootstrapAdmin = (username, secret) =>
+  request("/auth/admin/bootstrap", { method: "POST", body: { username, secret } });
+
+export const listPayouts = (token, status_filter = "pending") =>
+  request("/admin/payouts", { token, params: { status_filter } });
+export const approvePayout = (token, id) =>
+  request(`/admin/payouts/${id}/approve`, { method: "POST", token });
+export const rejectPayout = (token, id) =>
+  request(`/admin/payouts/${id}/reject`, { method: "POST", token });
+
+export const listPendingPlaces = (token) => request("/places/pending", { token });
+export const approvePlace = (token, id) => request(`/places/${id}/approve`, { method: "POST", token });
+export const rejectPlace = (token, id) => request(`/places/${id}/reject`, { method: "POST", token });
+
+export const listAllFeedback = (token) => request("/feedback", { token });
