@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     # --- Security / JWT ---
     # MUST be overridden via env var in any non-local environment.
     SECRET_KEY: str = "dev-only-insecure-secret-change-me"
+
+    # --- Admin bootstrap ---
+    # One-time-use secret used to promote an existing account to admin via
+    # POST /auth/admin/bootstrap. Empty by default so the endpoint is a
+    # hard 404-equivalent (403) until explicitly configured. Set this as an
+    # env var on Render, call the endpoint once, then unset/rotate it.
+    ADMIN_BOOTSTRAP_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
