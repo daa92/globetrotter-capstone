@@ -29,6 +29,7 @@ from app.google_oauth import verify_google_id_token
 from app.notifications import outbox
 from app.notifications.service import create_notification
 from app.schemas import (
+    AdminBootstrapRequest,
     GoogleAuthRequest,
     MFAConfirmRequest,
     MFALoginChallenge,
@@ -43,6 +44,7 @@ from app.schemas import (
     UserRegister,
     VerifyRequest,
 )
+import secrets as _secrets
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -438,3 +440,30 @@ def google_login(payload: GoogleAuthRequest, response: Response):
     access_token = security.create_access_token(user["username"])
     _set_refresh_cookie(response, user["username"])
     return TokenResponse(access_token=access_token, expires_in_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+
+@router.post("/admin/bootstrap", status_code=status.HTTP_200_OK)
+def bootstrap_admin(payload: AdminBootstrapRequest):
+    """
+    One-time promotion of an existing account to admin.
+
+    Gated entirely by ADMIN_BOOTSTRAP_SECRET (set as an env var on the
+    server, never committed). If that env var is unset/empty, this
+    endpoint always 403s, so it's inert until you deliberately turn it on.
+    Constant-time comparison to avoid timing attacks on the secret.
+
+    Recommended usage: set the env var on Render, call this endpoint once
+    for your own account, then remove/rotate the env var so the endpoint
+    goes dead again.
+    """
+    expected = settings.ADMIN_BOOTSTRAP_SECRET
+    if not expected or not _secrets.compare_digest(payload.secret, expected):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    updated = storage.update_one(
+        storage.USERS_FILE, "username", payload.username, {"is_admin": True}
+    )
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such user")
+
+    return {"detail": f"'{payload.username}' is now an admin"}
