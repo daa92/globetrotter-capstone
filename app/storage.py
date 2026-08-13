@@ -1,119 +1,124 @@
 """
 app/storage.py
 
-Phase 1 persistence: plain JSON files under /data.
+Phase 2 persistence: TiDB (MySQL-compatible), through the single generic
+`store` table defined in app/db.py.
 
-This is intentionally the "naive" storage layer the capstone asks for in
-Phase 1 (no database yet). It is deliberately isolated behind small,
-single-purpose functions so that swapping it for a real database in
-Phase 2 only means rewriting this file — no router/business-logic code
-should ever touch the filesystem directly.
+This is a drop-in replacement for the old JSON-file version: every
+function below keeps the exact same name, signature, and behavior, so no
+router or business-logic code anywhere else in the app needed to change
+— they still just do things like storage.read_all(storage.USERS_FILE).
 
-NOT thread-safe beyond a simple in-process lock. That's expected: it's a
-documented limitation of Phase 1 (see README "Known Limitations"), one of
-the exact pain points the capstone wants you to experience.
+The "_FILE" constants now hold a logical *collection name* string instead
+of a filesystem path. The name was kept (rather than renamed to
+"_COLLECTION") purely to avoid touching every call site across the app.
 """
 import json
-import os
 import threading
 from typing import Any
 
-_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(_BASE_DIR, "data")
+from sqlalchemy import delete, insert, select, update
 
-USERS_FILE = os.path.join(DATA_DIR, "users.json")
-ITINERARIES_FILE = os.path.join(DATA_DIR, "itineraries.json")
-DESTINATIONS_FILE = os.path.join(DATA_DIR, "destinations.json")
-PLACES_FILE = os.path.join(DATA_DIR, "places.json")
-FEEDBACK_FILE = os.path.join(DATA_DIR, "feedback.json")
-OUTBOX_FILE = os.path.join(DATA_DIR, "outbox.json")
-ACTIVITY_FILE = os.path.join(DATA_DIR, "activity.json")
-REFERRALS_FILE = os.path.join(DATA_DIR, "referrals.json")
-PAYOUTS_FILE = os.path.join(DATA_DIR, "payouts.json")
-NOTIFICATIONS_FILE = os.path.join(DATA_DIR, "notifications.json")
-GEO_CACHE_FILE = os.path.join(DATA_DIR, "geo_cache.json")
+from app import db
 
+USERS_FILE = "users"
+ITINERARIES_FILE = "itineraries"
+DESTINATIONS_FILE = "destinations"
+PLACES_FILE = "places"
+FEEDBACK_FILE = "feedback"
+OUTBOX_FILE = "outbox"
+ACTIVITY_FILE = "activity"
+REFERRALS_FILE = "referrals"
+PAYOUTS_FILE = "payouts"
+NOTIFICATIONS_FILE = "notifications"
+GEO_CACHE_FILE = "geo_cache"
+
+# A process-local lock still guards read-modify-write sequences, matching
+# the old file-based version's documented limitation (see its original
+# docstring). Real cross-process/cross-instance safety would need
+# SELECT ... FOR UPDATE row locking — a reasonable next step, but out of
+# scope for this swap; Render's free/starter tiers run a single instance
+# anyway.
 _lock = threading.Lock()
 
 
-def _read_json(filepath: str) -> list[dict[str, Any]]:
-    if not os.path.exists(filepath):
-        return []
-    with open(filepath, "r", encoding="utf-8") as fh:
-        content = fh.read().strip()
-        return json.loads(content) if content else []
+def _normalize(data: Any) -> dict[str, Any]:
+    """SQLite stores JSON as TEXT (returned as a str); MySQL/TiDB's JSON
+    type round-trips as a dict already. Handle both so this file doesn't
+    care which backend is active."""
+    return json.loads(data) if isinstance(data, str) else data
 
 
-def _write_json(filepath: str, data: list[dict[str, Any]]) -> None:
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    tmp_path = f"{filepath}.tmp"
-    with open(tmp_path, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, indent=2, ensure_ascii=False)
-    os.replace(tmp_path, filepath)  # atomic-ish swap, avoids half-written files
+def _select_rows(conn, collection: str) -> list[tuple[int, dict]]:
+    rows = conn.execute(
+        select(db.store.c.id, db.store.c.data)
+        .where(db.store.c.collection == collection)
+        .order_by(db.store.c.id)
+    ).all()
+    return [(row.id, _normalize(row.data)) for row in rows]
 
 
 # ---------------------------------------------------------------------------
 # Generic collection helpers
 # ---------------------------------------------------------------------------
 
-def read_all(filepath: str) -> list[dict[str, Any]]:
-    with _lock:
-        return _read_json(filepath)
+def read_all(collection: str) -> list[dict[str, Any]]:
+    with _lock, db.engine.begin() as conn:
+        return [data for _, data in _select_rows(conn, collection)]
 
 
-def append(filepath: str, record: dict[str, Any]) -> None:
-    with _lock:
-        records = _read_json(filepath)
-        records.append(record)
-        _write_json(filepath, records)
+def append(collection: str, record: dict[str, Any]) -> None:
+    with _lock, db.engine.begin() as conn:
+        conn.execute(insert(db.store).values(collection=collection, data=record))
 
 
-def replace_all(filepath: str, records: list[dict[str, Any]]) -> None:
-    with _lock:
-        _write_json(filepath, records)
+def replace_all(collection: str, records: list[dict[str, Any]]) -> None:
+    with _lock, db.engine.begin() as conn:
+        conn.execute(delete(db.store).where(db.store.c.collection == collection))
+        if records:
+            conn.execute(
+                insert(db.store),
+                [{"collection": collection, "data": r} for r in records],
+            )
 
 
-def update_one(filepath: str, match_key: str, match_value: Any, updates: dict[str, Any]) -> bool:
+def update_one(collection: str, match_key: str, match_value: Any, updates: dict[str, Any]) -> bool:
     """Update the first record where record[match_key] == match_value. Returns True if found."""
-    with _lock:
-        records = _read_json(filepath)
-        for record in records:
-            if record.get(match_key) == match_value:
-                record.update(updates)
-                _write_json(filepath, records)
+    with _lock, db.engine.begin() as conn:
+        for row_id, data in _select_rows(conn, collection):
+            if data.get(match_key) == match_value:
+                data.update(updates)
+                conn.execute(update(db.store).where(db.store.c.id == row_id).values(data=data))
                 return True
         return False
 
 
-def delete_one(filepath: str, match_key: str, match_value: Any) -> bool:
-    with _lock:
-        records = _read_json(filepath)
-        new_records = [r for r in records if r.get(match_key) != match_value]
-        if len(new_records) == len(records):
-            return False
-        _write_json(filepath, new_records)
-        return True
+def delete_one(collection: str, match_key: str, match_value: Any) -> bool:
+    with _lock, db.engine.begin() as conn:
+        for row_id, data in _select_rows(conn, collection):
+            if data.get(match_key) == match_value:
+                conn.execute(delete(db.store).where(db.store.c.id == row_id))
+                return True
+        return False
 
 
-def update_many(filepath: str, match_key: str, match_values: set, updates: dict[str, Any]) -> int:
+def update_many(collection: str, match_key: str, match_values: set, updates: dict[str, Any]) -> int:
     """Update every record whose record[match_key] is in match_values. Returns count updated."""
-    with _lock:
-        records = _read_json(filepath)
+    with _lock, db.engine.begin() as conn:
         count = 0
-        for record in records:
-            if record.get(match_key) in match_values:
-                record.update(updates)
+        for row_id, data in _select_rows(conn, collection):
+            if data.get(match_key) in match_values:
+                data.update(updates)
+                conn.execute(update(db.store).where(db.store.c.id == row_id).values(data=data))
                 count += 1
-        if count:
-            _write_json(filepath, records)
         return count
 
 
-def delete_many(filepath: str, match_key: str, match_values: set) -> int:
-    with _lock:
-        records = _read_json(filepath)
-        new_records = [r for r in records if r.get(match_key) not in match_values]
-        count = len(records) - len(new_records)
-        if count:
-            _write_json(filepath, new_records)
-        return count
+def delete_many(collection: str, match_key: str, match_values: set) -> int:
+    with _lock, db.engine.begin() as conn:
+        ids_to_delete = [
+            row_id for row_id, data in _select_rows(conn, collection) if data.get(match_key) in match_values
+        ]
+        if ids_to_delete:
+            conn.execute(delete(db.store).where(db.store.c.id.in_(ids_to_delete)))
+        return len(ids_to_delete)
