@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.cleanup import run_cleanup_loop
 from app.config import settings
+from app.db import init_db
 from app.routers import auth, destinations, earnings, feedback, geo, itineraries, notifications, places, recommendations, users
 
 logger = logging.getLogger("gt.app")
@@ -21,6 +22,7 @@ logger = logging.getLogger("gt.app")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()  # idempotent — creates the `store` table if it doesn't exist yet
     # Background task: purges unverified accounts older than
     # UNVERIFIED_ACCOUNT_TTL_MINUTES, every VERIFICATION_CLEANUP_INTERVAL_SECONDS.
     cleanup_task = asyncio.create_task(run_cleanup_loop())
