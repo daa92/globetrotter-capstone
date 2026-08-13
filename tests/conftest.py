@@ -1,38 +1,30 @@
 """
 tests/conftest.py
 
-Points storage at a throwaway temp directory for every test run, so tests
-never touch (or depend on) real data/*.json files.
-"""
-import json
-import shutil
+Points storage at a fresh, isolated SQLite database for every test run,
+so tests never touch (or depend on) the real TiDB database.
 
+This replaces the old approach of monkeypatching storage.py's file-path
+constants — now that storage.py is DB-backed, the equivalent isolation
+is a throwaway SQLite engine, swapped in via monkeypatch on `db.engine`
+(storage.py looks that up as `db.engine` at call time rather than
+importing it by value, specifically so this works — see app/db.py).
+"""
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
 
-from app import create_app, storage
+from app import create_app, db, storage
 
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    # Redirect every storage path constant at a fresh temp directory.
-    data_dir = tmp_path / "data"
-    data_dir.mkdir()
+    test_engine = create_engine(f"sqlite:///{tmp_path}/test.db")
+    monkeypatch.setattr(db, "engine", test_engine)
+    db.metadata.create_all(test_engine)
 
-    monkeypatch.setattr(storage, "DATA_DIR", str(data_dir))
-    monkeypatch.setattr(storage, "USERS_FILE", str(data_dir / "users.json"))
-    monkeypatch.setattr(storage, "ITINERARIES_FILE", str(data_dir / "itineraries.json"))
-    monkeypatch.setattr(storage, "DESTINATIONS_FILE", str(data_dir / "destinations.json"))
-    monkeypatch.setattr(storage, "PLACES_FILE", str(data_dir / "places.json"))
-    monkeypatch.setattr(storage, "FEEDBACK_FILE", str(data_dir / "feedback.json"))
-    monkeypatch.setattr(storage, "OUTBOX_FILE", str(data_dir / "outbox.json"))
-    monkeypatch.setattr(storage, "ACTIVITY_FILE", str(data_dir / "activity.json"))
-    monkeypatch.setattr(storage, "REFERRALS_FILE", str(data_dir / "referrals.json"))
-    monkeypatch.setattr(storage, "PAYOUTS_FILE", str(data_dir / "payouts.json"))
-    monkeypatch.setattr(storage, "NOTIFICATIONS_FILE", str(data_dir / "notifications.json"))
-    monkeypatch.setattr(storage, "GEO_CACHE_FILE", str(data_dir / "geo_cache.json"))
-
-    seed = [
+    storage.append(
+        storage.DESTINATIONS_FILE,
         {
             "id": "test-dest-1",
             "name": "Test Beach",
@@ -44,12 +36,11 @@ def client(tmp_path, monkeypatch):
             "longitude": 9.91,
             "avg_cost_fcfa": 5000,
             "submitted_by": None,
-        }
-    ]
-    (data_dir / "destinations.json").write_text(json.dumps(seed))
+        },
+    )
 
     app = create_app()
     with TestClient(app) as test_client:
         yield test_client
 
-    shutil.rmtree(tmp_path, ignore_errors=True)
+    test_engine.dispose()
