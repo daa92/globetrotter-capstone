@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     # MUST be overridden via env var in any non-local environment.
     SECRET_KEY: str = "dev-only-insecure-secret-change-me"
 
+    # --- Database (Phase 2: TiDB, MySQL-compatible) ---
+    # Production (Render): a TiDB connection string, e.g.
+    #   mysql+pymysql://user:password@host:4000/globetrotter
+    # If unset, falls back to a local SQLite file — keeps local dev/tests
+    # zero-config. See app/db.py.
+    DATABASE_URL: str = ""
+
     # --- Admin bootstrap ---
     # One-time-use secret used to promote an existing account to admin via
     # POST /auth/admin/bootstrap. Empty by default so the endpoint is a
