@@ -81,14 +81,18 @@ def _verification_email_html(username: str, token: str) -> str:
          calls POST /auth/verify itself (the new flow).
       2. Copy the code shown below into the in-app "enter your code"
          screen you land on right after registering.
+
+    NOTE: keep the literal "token: {token}\\n" line intact — the test
+    suite extracts tokens from outbox messages via
+    body.split("token: ")[1].split("\\n")[0]; this has to stay exact.
     """
     link = f"{settings.FRONTEND_URL}/verify?token={token}"
     return (
-        f"<p>Welcome to GlobeTrotter, {username}!</p>"
+        f"<p>Welcome to GlobeTrotter, {username}!</p>\n"
+        f"token: {token}\n"
         f"<p>Verify your account within {settings.UNVERIFIED_ACCOUNT_TTL_MINUTES} minutes "
-        f'by clicking here: <a href="{link}">{link}</a></p>'
-        f"<p>Or, if you're still on the sign-up screen, enter this code there: "
-        f"<strong>{token}</strong></p>"
+        f'by clicking here: <a href="{link}">{link}</a></p>\n'
+        f"<p>Or, if you're still on the sign-up screen, enter the code above.</p>\n"
         f"<p>If you didn't create this account, you can ignore this email.</p>"
     )
 
