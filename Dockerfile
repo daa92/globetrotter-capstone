@@ -7,13 +7,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
-COPY data/destinations.json ./data/destinations.json
 
 # Run as a non-root user
 RUN useradd --create-home appuser
-
-RUN mkdir -p /globetrotter/data && chown -R appuser:appuser /globetrotter/data
-
 USER appuser
 
 EXPOSE 8000
