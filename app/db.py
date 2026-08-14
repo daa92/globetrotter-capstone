@@ -43,13 +43,18 @@ def _make_engine():
 
     connect_args = {}
     if url.startswith("mysql"):
-        # TiDB requires TLS. Verifying against the system CA bundle (via
-        # certifi) matches TiDB Cloud's documented Python connection
-        # approach for PyMySQL.
+        # TiDB requires TLS with full identity verification. This mirrors
+        # TiDB Cloud's own documented connection string
+        # (?ssl_ca=...&ssl_verify_cert=true&ssl_verify_identity=true) —
+        # using certifi's bundle instead of a fixed OS path (e.g.
+        # /etc/ssl/certs/ca-certificates.crt) so this works the same on
+        # any host OS/container, not just Debian/Ubuntu.
         import certifi
 
         connect_args = {
-            "ssl": {"ca": certifi.where()},
+            "ssl_ca": certifi.where(),
+            "ssl_verify_cert": True,
+            "ssl_verify_identity": True,
         }
 
     return create_engine(
