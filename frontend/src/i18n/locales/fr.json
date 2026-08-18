@@ -250,5 +250,24 @@
     "airport": "Aéroport",
     "supermarket": "Supermarché",
     "market": "Marché"
+  },
+  "feedback": {
+    "buttonLabel": "Avis",
+    "title": "Envoyer un avis",
+    "subtitle": "Bugs, idées, autre chose — ça va directement à l'équipe.",
+    "category": "Catégorie",
+    "categoryBug": "Bug",
+    "categorySuggestion": "Suggestion",
+    "categoryPlaceReport": "Signaler un lieu",
+    "categoryOther": "Autre",
+    "message": "Message",
+    "messagePlaceholder": "Qu'avez-vous en tête ?",
+    "rating": "Note (optionnel)",
+    "submit": "Envoyer",
+    "sending": "Envoi…",
+    "success": "Merci — avis envoyé !",
+    "loginRequired": "Connectez-vous pour envoyer un avis.",
+    "loginLink": "Connexion",
+    "close": "Fermer"
   }
 }
