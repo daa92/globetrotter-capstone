@@ -176,4 +176,5 @@ export const listPendingPlaces = (token) => request("/places/pending", { token }
 export const approvePlace = (token, id) => request(`/places/${id}/approve`, { method: "POST", token });
 export const rejectPlace = (token, id) => request(`/places/${id}/reject`, { method: "POST", token });
 
+export const submitFeedback = (token, payload) => request("/feedback", { method: "POST", token, body: payload });
 export const listAllFeedback = (token) => request("/feedback", { token });
