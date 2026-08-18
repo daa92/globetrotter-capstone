@@ -250,5 +250,24 @@
     "airport": "Airport",
     "supermarket": "Supermarket",
     "market": "Market"
+  },
+  "feedback": {
+    "buttonLabel": "Feedback",
+    "title": "Send feedback",
+    "subtitle": "Bugs, ideas, anything else — this goes straight to the team.",
+    "category": "Category",
+    "categoryBug": "Bug",
+    "categorySuggestion": "Suggestion",
+    "categoryPlaceReport": "Report a place",
+    "categoryOther": "Other",
+    "message": "Message",
+    "messagePlaceholder": "What's on your mind?",
+    "rating": "Rating (optional)",
+    "submit": "Send",
+    "sending": "Sending…",
+    "success": "Thanks — feedback sent!",
+    "loginRequired": "Log in to send feedback.",
+    "loginLink": "Log in",
+    "close": "Close"
   }
 }
