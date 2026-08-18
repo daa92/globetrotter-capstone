@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import Hero from "../components/layout/Hero";
 
 export default function Home() {
@@ -9,13 +10,13 @@ export default function Home() {
       <p className="mt-4 text-white/70 max-w-xl mx-auto">
         Placeholder homepage copy — real content coming in the next design pass.
       </p>
-      <a
-        href="/explore"
+      <Link
+        to="/explore"
         className="mt-8 inline-block rounded-full px-6 py-3 font-semibold transition"
         style={{ backgroundColor: "#C9975C", color: "#0F2027" }}
       >
         {t("home.cta")}
-      </a>
+      </Link>
     </Hero>
   );
 }
