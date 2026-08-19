@@ -1,4 +1,5 @@
 from app import storage
+from app.config import settings
 from app.notifications import outbox
 
 
@@ -50,6 +51,42 @@ def test_login_success_returns_access_token_and_refresh_cookie(client):
     assert resp.status_code == 200
     assert "access_token" in resp.json()
     assert "gt_refresh_token" in resp.cookies
+
+
+def test_refresh_cookie_is_samesite_none_when_secure(client, monkeypatch):
+    """
+    Regression test for the "visiting the admin page logs me out" bug.
+
+    Frontend and backend live on different origins in production, so the
+    refresh cookie is cross-site. SameSite=Lax cookies are NOT attached to
+    cross-site fetch()/XHR calls (only top-level navigations), so a Lax
+    cookie set in production silently fails to reach POST /auth/refresh on
+    every full page load — which is exactly what happens on the admin
+    route, since it's the one page reached by typing/bookmarking a URL
+    instead of an in-app <Link>. Once COOKIE_SECURE is on (real HTTPS
+    deploy), the cookie must be SameSite=None or session-restore-on-reload
+    silently breaks everywhere, not just on that page.
+    """
+    monkeypatch.setattr(settings, "COOKIE_SECURE", True)
+    _register_and_verify(client)
+    resp = client.post("/auth/login", json={"username": "alice", "password": "s3cr3t12"})
+    assert resp.status_code == 200
+    set_cookie = resp.headers.get("set-cookie", "")
+    assert "gt_refresh_token" in set_cookie
+    assert "samesite=none" in set_cookie.lower()
+    assert "secure" in set_cookie.lower()
+
+
+def test_refresh_cookie_is_samesite_lax_when_not_secure(client, monkeypatch):
+    """Local/plain-http dev (COOKIE_SECURE=False) keeps Lax — SameSite=None
+    without Secure is rejected outright by browsers, and local dev doesn't
+    need it since it isn't genuinely cross-site in the way that matters."""
+    monkeypatch.setattr(settings, "COOKIE_SECURE", False)
+    _register_and_verify(client)
+    resp = client.post("/auth/login", json={"username": "alice", "password": "s3cr3t12"})
+    assert resp.status_code == 200
+    set_cookie = resp.headers.get("set-cookie", "")
+    assert "samesite=lax" in set_cookie.lower()
 
 
 def test_protected_route_requires_token(client):
