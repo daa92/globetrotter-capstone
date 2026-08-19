@@ -17,7 +17,7 @@ or all)."
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app import storage
-from app.dependencies import get_current_admin, get_current_user
+from app.dependencies import get_current_user, require_permission
 from app.notifications import outbox
 from app.notifications.service import create_for_many
 from app.schemas import AdminSendNotificationRequest, NotificationBatchAction, NotificationOut
@@ -86,7 +86,7 @@ def delete_many_notifications(payload: NotificationBatchAction, user: dict = Dep
 # ---------------------------------------------------------------------------
 
 @router.post("/admin/notifications/send", status_code=status.HTTP_201_CREATED)
-def admin_send_notification(payload: AdminSendNotificationRequest, admin: dict = Depends(get_current_admin)):
+def admin_send_notification(payload: AdminSendNotificationRequest, admin: dict = Depends(require_permission("notifications"))):
     users = storage.read_all(storage.USERS_FILE)
 
     if payload.broadcast:
