@@ -27,10 +27,13 @@ def _auth_headers(token):
 
 
 def _make_admin(username):
+    """Test helper: gives this user full admin access (principal-level, so
+    tests don't need to know/care about the granular permission list)."""
     users = storage.read_all(storage.USERS_FILE)
     for u in users:
         if u["username"] == username:
             u["is_admin"] = True
+            u["is_principal_admin"] = True
     storage.replace_all(storage.USERS_FILE, users)
 
 
