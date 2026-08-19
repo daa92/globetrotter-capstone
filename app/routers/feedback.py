@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 
 from app import storage
-from app.dependencies import get_current_admin, get_current_user
+from app.dependencies import get_current_user, require_permission
 from app.notifications import outbox
 from app.schemas import FeedbackCreate
 
@@ -60,6 +60,6 @@ def submit_feedback(payload: FeedbackCreate, user: dict = Depends(get_current_us
 
 
 @router.get("")
-def list_feedback(admin: dict = Depends(get_current_admin)):
+def list_feedback(admin: dict = Depends(require_permission("feedback"))):
     """Admin-only: full feedback list feeds the hidden dashboard."""
     return storage.read_all(storage.FEEDBACK_FILE)
