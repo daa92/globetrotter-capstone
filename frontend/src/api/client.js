@@ -178,3 +178,22 @@ export const rejectPlace = (token, id) => request(`/places/${id}/reject`, { meth
 
 export const submitFeedback = (token, payload) => request("/feedback", { method: "POST", token, body: payload });
 export const listAllFeedback = (token) => request("/feedback", { token });
+
+// ---------------------------------------------------------------------------
+// Admin management (principal-admin only — promote/revoke other admins,
+// grant/retrieve specific privileges). Every call still enforced
+// server-side by get_current_principal_admin regardless of what the UI
+// shows/hides.
+// ---------------------------------------------------------------------------
+
+export const ADMIN_PERMISSIONS = ["payouts", "places", "feedback", "notifications"];
+
+export const listAdmins = (token) => request("/admin/admins", { token });
+export const searchUsersForPromotion = (token, q) =>
+  request("/admin/admins/search", { token, params: { q } });
+export const promoteAdmin = (token, username, permissions) =>
+  request(`/admin/admins/${username}/promote`, { method: "POST", token, body: { permissions } });
+export const updateAdminPermissions = (token, username, permissions) =>
+  request(`/admin/admins/${username}/permissions`, { method: "PATCH", token, body: { permissions } });
+export const revokeAdmin = (token, username) =>
+  request(`/admin/admins/${username}/revoke`, { method: "POST", token });
