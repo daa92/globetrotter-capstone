@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app import storage
 from app.config import settings
-from app.dependencies import get_current_admin, get_current_user
+from app.dependencies import get_current_user, require_permission
 from app.notifications.service import create_notification
 from app.schemas import (
     DailyActivity,
@@ -183,7 +183,7 @@ def request_payout(user: dict = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 @router.get("/admin/payouts")
-def list_payouts(status_filter: str = "pending", admin: dict = Depends(get_current_admin)):
+def list_payouts(status_filter: str = "pending", admin: dict = Depends(require_permission("payouts"))):
     payouts = storage.read_all(storage.PAYOUTS_FILE)
     if status_filter == "all":
         return payouts
@@ -191,7 +191,7 @@ def list_payouts(status_filter: str = "pending", admin: dict = Depends(get_curre
 
 
 @router.post("/admin/payouts/{payout_id}/approve")
-def approve_payout(payout_id: str, admin: dict = Depends(get_current_admin)):
+def approve_payout(payout_id: str, admin: dict = Depends(require_permission("payouts"))):
     payouts = storage.read_all(storage.PAYOUTS_FILE)
     payout = next((p for p in payouts if p["id"] == payout_id), None)
     if not payout:
@@ -207,7 +207,7 @@ def approve_payout(payout_id: str, admin: dict = Depends(get_current_admin)):
 
 
 @router.post("/admin/payouts/{payout_id}/reject")
-def reject_payout(payout_id: str, admin: dict = Depends(get_current_admin)):
+def reject_payout(payout_id: str, admin: dict = Depends(require_permission("payouts"))):
     payouts = storage.read_all(storage.PAYOUTS_FILE)
     payout = next((p for p in payouts if p["id"] == payout_id), None)
     if not payout:
