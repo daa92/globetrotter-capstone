@@ -198,6 +198,7 @@ def test_admin_can_approve_payout_and_it_reduces_available_balance(client):
     for u in users:
         if u["username"] == "admin_payout_test":
             u["is_admin"] = True
+            u["admin_permissions"] = ["payouts"]
     storage.replace_all(storage.USERS_FILE, users)
 
     payout = {
