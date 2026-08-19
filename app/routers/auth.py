@@ -23,6 +23,7 @@ from google.auth.exceptions import GoogleAuthError
 from jose import JWTError
 
 from app import security, storage
+from app import dependencies
 from app.config import settings
 from app.dependencies import get_current_user
 from app.google_oauth import verify_google_id_token
@@ -56,7 +57,10 @@ def _set_refresh_cookie(response: Response, username: str) -> None:
         value=refresh_token,
         httponly=True,
         secure=settings.COOKIE_SECURE,
-        samesite="lax",
+        # Cross-site (frontend on Vercel, API on a different origin) needs
+        # SameSite=None or the browser won't attach the cookie to the
+        # fetch() call in POST /auth/refresh — see COOKIE_SAMESITE docstring.
+        samesite=settings.COOKIE_SAMESITE,
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/auth",
     )
@@ -312,7 +316,14 @@ def refresh(
 
 @router.post("/logout")
 def logout(response: Response):
-    response.delete_cookie(settings.COOKIE_NAME_REFRESH, path="/auth")
+    # secure/samesite must match how the cookie was originally set, or some
+    # browsers (Chrome included) won't actually clear a SameSite=None cookie.
+    response.delete_cookie(
+        settings.COOKIE_NAME_REFRESH,
+        path="/auth",
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+    )
     return {"detail": "Logged out"}
 
 
@@ -462,12 +473,19 @@ def google_login(payload: GoogleAuthRequest, response: Response):
 @router.post("/admin/bootstrap", status_code=status.HTTP_200_OK)
 def bootstrap_admin(payload: AdminBootstrapRequest):
     """
-    One-time promotion of an existing account to admin.
+    One-time promotion of an existing account to *principal* admin.
 
     Gated entirely by ADMIN_BOOTSTRAP_SECRET (set as an env var on the
     server, never committed). If that env var is unset/empty, this
     endpoint always 403s, so it's inert until you deliberately turn it on.
     Constant-time comparison to avoid timing attacks on the secret.
+
+    This only ever works once: it creates the system's single principal
+    admin (who can then promote/revoke/permission every other admin from
+    the dashboard). Once a principal admin exists, this endpoint refuses
+    — further admins are managed via POST /admin/admins/{username}/promote
+    by the principal, not by this secret. That keeps the bootstrap secret
+    from being a standing way to mint arbitrary admins after initial setup.
 
     Recommended usage: set the env var on Render, call this endpoint once
     for your own account, then remove/rotate the env var so the endpoint
@@ -477,10 +495,26 @@ def bootstrap_admin(payload: AdminBootstrapRequest):
     if not expected or not _secrets.compare_digest(payload.secret, expected):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
+    users = storage.read_all(storage.USERS_FILE)
+    if any(u.get("is_principal_admin") for u in users):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A principal admin already exists. Use the admin dashboard to manage admins.",
+        )
+
     updated = storage.update_one(
-        storage.USERS_FILE, "username", payload.username, {"is_admin": True}
+        storage.USERS_FILE,
+        "username",
+        payload.username,
+        {
+            "is_admin": True,
+            "is_principal_admin": True,
+            "admin_permissions": sorted(dependencies.ADMIN_PERMISSIONS),
+            "admin_promoted_at": datetime.now(timezone.utc).isoformat(),
+            "admin_promoted_by": "bootstrap",
+        },
     )
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such user")
 
-    return {"detail": f"'{payload.username}' is now an admin"}
+    return {"detail": f"'{payload.username}' is now the principal admin"}
