@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app import storage
-from app.dependencies import get_current_admin, get_current_user
+from app.dependencies import get_current_user, require_permission
 from app.notifications.service import create_notification
 from app.schemas import PlaceSubmission
 
@@ -41,13 +41,13 @@ def list_my_submissions(user: dict = Depends(get_current_user)):
 
 
 @router.get("/pending")
-def list_pending_submissions(admin: dict = Depends(get_current_admin)):
+def list_pending_submissions(admin: dict = Depends(require_permission("places"))):
     places = storage.read_all(storage.PLACES_FILE)
     return [p for p in places if p["status"] == "pending"]
 
 
 @router.post("/{place_id}/approve")
-def approve_place(place_id: str, admin: dict = Depends(get_current_admin)):
+def approve_place(place_id: str, admin: dict = Depends(require_permission("places"))):
     places = storage.read_all(storage.PLACES_FILE)
     place = next((p for p in places if p["id"] == place_id), None)
     if not place:
@@ -79,7 +79,7 @@ def approve_place(place_id: str, admin: dict = Depends(get_current_admin)):
 
 
 @router.post("/{place_id}/reject")
-def reject_place(place_id: str, admin: dict = Depends(get_current_admin)):
+def reject_place(place_id: str, admin: dict = Depends(require_permission("places"))):
     places = storage.read_all(storage.PLACES_FILE)
     place = next((p for p in places if p["id"] == place_id), None)
     if not place:
