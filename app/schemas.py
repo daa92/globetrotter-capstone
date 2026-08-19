@@ -94,6 +94,12 @@ class UserPublic(BaseModel):
     is_verified: bool = False
     referral_code: str
     created_at: str
+    # Without these, the frontend's `user.is_admin` / hidden admin-dashboard
+    # route check was always false for everyone, admins included — this
+    # model is what /users/me actually serializes through.
+    is_admin: bool = False
+    is_principal_admin: bool = False
+    admin_permissions: list[str] = Field(default_factory=list)
 
 
 class VerifyRequest(BaseModel):
@@ -276,3 +282,33 @@ class AdminSendNotificationRequest(BaseModel):
 class AdminBootstrapRequest(BaseModel):
     username: str = Field(min_length=1, description="Existing account to promote to admin")
     secret: str = Field(min_length=1, description="Must match ADMIN_BOOTSTRAP_SECRET env var")
+
+
+# ---------------------------------------------------------------------------
+# Admin management (principal-admin only: promote/revoke other admins,
+# grant/retrieve specific privileges)
+# ---------------------------------------------------------------------------
+
+class AdminUserOut(BaseModel):
+    username: str
+    email: Optional[EmailStr] = None
+    is_principal_admin: bool
+    admin_permissions: list[str]
+    promoted_at: Optional[str] = None
+
+
+class AdminPromoteRequest(BaseModel):
+    permissions: list[str] = Field(
+        default_factory=list,
+        description="Subset of the grantable admin permissions to start this admin with",
+    )
+
+
+class AdminPermissionsUpdate(BaseModel):
+    permissions: list[str] = Field(description="Full replacement list of this admin's permissions")
+
+
+class UserSearchResult(BaseModel):
+    username: str
+    email: Optional[EmailStr] = None
+    is_admin: bool
