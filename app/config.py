@@ -47,6 +47,26 @@ class Settings(BaseSettings):
     COOKIE_NAME_REFRESH: str = "gt_refresh_token"
     COOKIE_SECURE: bool = False  # set True behind HTTPS in production
 
+    @property
+    def COOKIE_SAMESITE(self) -> str:
+        """
+        The frontend (Vercel) and backend API are on different origins, so
+        the refresh cookie is a cross-site cookie. Browsers only attach
+        SameSite=Lax cookies to top-level navigations, NOT to cross-site
+        fetch()/XHR calls — so a Lax cookie set in production silently
+        fails to reach POST /auth/refresh on every full page load (reload,
+        typed URL, bookmark), even though the login response itself always
+        sets it fine. That's what caused a real user-facing bug: the one
+        route in the app (the admin dashboard) that isn't reachable via
+        client-side <Link> navigation looked like it "logged people out",
+        when actually the silent session-restore was failing on reload.
+        SameSite=None (required for cross-site) only works with Secure, so
+        we only use it once COOKIE_SECURE is on (i.e. real HTTPS deploys);
+        local dev over plain http keeps Lax since same-site localhost
+        doesn't need None and browsers reject None without Secure/HTTPS.
+        """
+        return "none" if self.COOKIE_SECURE else "lax"
+
     # --- MFA ---
     MFA_ISSUER_NAME: str = "GlobeTrotter"
 
