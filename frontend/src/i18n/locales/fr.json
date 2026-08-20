@@ -8,7 +8,8 @@
     "login": "Connexion",
     "register": "S'inscrire",
     "profile": "Profil",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "adminDashboard": "Tableau admin"
   },
   "home": {
     "tagline": "Découvrez le Cameroun, un lieu à la fois.",
