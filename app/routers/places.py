@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app import storage
+from app import audit
 from app.dependencies import get_current_user, require_permission
 from app.notifications.service import create_notification
 from app.schemas import PlaceSubmission
@@ -69,6 +70,7 @@ def approve_place(place_id: str, admin: dict = Depends(require_permission("place
         "submitted_by": place["submitted_by"],
     }
     storage.append(storage.DESTINATIONS_FILE, destination)
+    audit.log_action(admin["username"], "place.approved", target=place["name"], details=f"submitted by {place['submitted_by']}")
     create_notification(
         username=place["submitted_by"],
         title="Your place submission was approved!",
