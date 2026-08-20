@@ -11,13 +11,7 @@ import Profile from "../../pages/Profile";
 import HowToUse from "../../pages/HowToUse";
 import Verify from "../../pages/Verify";
 import AdminDashboard from "../../pages/AdminDashboard";
-
-// Deliberately unlisted path — not referenced by any nav/link in the app,
-// so it's only reachable by someone who already knows it. This is
-// obscurity on top of, not instead of, the real access control: the page
-// itself checks user.is_admin, and every API call it makes is re-checked
-// server-side by get_current_admin regardless of how someone got here.
-const ADMIN_PATH = "/admin-c746b9c7d7c57420";
+import { ADMIN_PATH } from "../../constants/adminPath";
 
 const pageVariants = {
   initial: { opacity: 0, y: 12 },
