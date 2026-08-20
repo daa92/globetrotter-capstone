@@ -1,12 +1,13 @@
 /**
  * src/pages/AdminDashboard.jsx
  *
- * Reachable only at the unlisted path configured in AnimatedRoutes.jsx
- * (not linked from any nav/menu — see App/AnimatedRoutes). That hidden
- * URL is obscurity, not security: every request this page makes is still
- * checked server-side by get_current_admin, so a non-admin who finds the
- * URL gets 403s, not data. If `user.is_admin` isn't true, we don't even
- * attempt the calls — we just say so.
+ * Reachable two ways: the unlisted ADMIN_PATH URL (see
+ * constants/adminPath.js), and — once you're a logged-in admin — a normal
+ * nav link in Navbar.jsx. Neither is the actual access control: every
+ * request this page makes is still checked server-side (get_current_admin
+ * / require_permission / get_current_principal_admin), so a non-admin
+ * gets 403s no matter how they arrive here. If `user.is_admin` isn't
+ * true, we don't even attempt the calls — we just say so.
  */
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
