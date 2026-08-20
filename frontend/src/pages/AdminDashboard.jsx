@@ -16,22 +16,34 @@ import {
   ApiError,
   approvePayout,
   approvePlace,
+  deleteUser,
+  getSystemOverview,
   listAdmins,
   listAllFeedback,
+  listAllUsers,
+  listAuditLogs,
   listPayouts,
   listPendingPlaces,
+  listSentNotifications,
+  lockUser,
   promoteAdmin,
   rejectPayout,
   rejectPlace,
   revokeAdmin,
   searchUsersForPromotion,
+  sendAdminNotification,
+  unlockUser,
   updateAdminPermissions,
 } from "../api/client";
 
-const TABS = [
-  { id: "payouts", label: "Payouts" },
-  { id: "places", label: "Place submissions" },
-  { id: "feedback", label: "Feedback" },
+const TABS_CONFIG = [
+  { id: "overview", label: "Overview", permission: null },
+  { id: "users", label: "Users", permission: "users" },
+  { id: "payouts", label: "Payouts", permission: "payouts" },
+  { id: "places", label: "Place submissions", permission: "places" },
+  { id: "feedback", label: "Feedback", permission: "feedback" },
+  { id: "notifications", label: "Notifications", permission: "notifications" },
+  { id: "logs", label: "Audit log", permission: "logs" },
 ];
 
 const PRINCIPAL_TAB = { id: "admins", label: "Manage admins" };
@@ -41,6 +53,8 @@ const PERMISSION_LABELS = {
   places: "Place submissions",
   feedback: "Feedback",
   notifications: "Send notifications",
+  users: "Manage users",
+  logs: "View audit log",
 };
 
 function Card({ children }) {
@@ -221,6 +235,472 @@ function FeedbackTab({ token }) {
           <p className="text-xs text-neutral-400 mt-1">{new Date(f.submitted_at).toLocaleString()}</p>
         </Card>
       ))}
+    </div>
+  );
+}
+
+function StatCard({ label, value, tone }) {
+  const tones = {
+    neutral: "",
+    warn: "text-amber-600 dark:text-amber-400",
+    danger: "text-red-600 dark:text-red-400",
+  };
+  return (
+    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 p-4">
+      <p className="text-xs text-neutral-400 mb-1">{label}</p>
+      <p className={`text-2xl font-semibold ${tones[tone] || ""}`}>{value}</p>
+    </div>
+  );
+}
+
+function OverviewTab({ token }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setData(await getSystemOverview(token));
+      } catch (err) {
+        setError(err instanceof ApiError ? err.detail : "Failed to load system overview");
+      }
+    })();
+  }, [token]);
+
+  if (error) return <p className="text-red-500 text-sm">{error}</p>;
+  if (!data) return <p className="text-sm text-neutral-400">Loading…</p>;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="Total users" value={data.total_users} />
+        <StatCard label="Verified" value={data.verified_users} />
+        <StatCard label="Unverified" value={data.unverified_users} tone={data.unverified_users > 0 ? "warn" : "neutral"} />
+        <StatCard label="Locked" value={data.locked_users} tone={data.locked_users > 0 ? "danger" : "neutral"} />
+        <StatCard label="Admins" value={data.total_admins} />
+        <StatCard label="New signups (7d)" value={data.new_registrations_last_7d} />
+        <StatCard label="Notifications sent (7d)" value={data.notifications_sent_last_7d} />
+        <StatCard label="Pending payouts" value={data.pending_payouts} tone={data.pending_payouts > 0 ? "warn" : "neutral"} />
+        <StatCard label="Payouts approved (total)" value={`$${data.approved_payouts_total_usd}`} />
+        <StatCard label="Pending place submissions" value={data.pending_place_submissions} tone={data.pending_place_submissions > 0 ? "warn" : "neutral"} />
+        <StatCard label="Total feedback" value={data.total_feedback} />
+        <StatCard label="Avg. feedback rating" value={data.average_feedback_rating ?? "—"} />
+      </div>
+
+      <div>
+        <p className="font-medium mb-2">Background jobs</p>
+        <div className="space-y-2">
+          {data.background_jobs.map((job) => (
+            <Card key={job.name}>
+              <p className="font-medium text-sm">{job.name}</p>
+              <p className="text-xs text-neutral-400 mt-1">{job.description}</p>
+              <p className="text-xs mt-2">
+                Runs every {job.interval_seconds}s · TTL {job.ttl_minutes}min · ran {job.run_count} time(s)
+                {job.last_run_at && <> · last run {new Date(job.last_run_at).toLocaleString()}</>}
+                {job.last_run_at && <> · purged {job.last_run_purged_count} last run</>}
+              </p>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UserRow({ u, token, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const doLock = async () => {
+    const reason = window.prompt(`Lock ${u.username}? Optional reason:`, "");
+    if (reason === null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await lockUser(token, u.username, reason || undefined);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Failed to lock user");
+      setBusy(false);
+    }
+  };
+
+  const doUnlock = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await unlockUser(token, u.username);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Failed to unlock user");
+      setBusy(false);
+    }
+  };
+
+  const doDelete = async () => {
+    if (!window.confirm(`Permanently delete ${u.username}? This cannot be undone.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteUser(token, u.username);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Failed to delete user");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-medium">
+            {u.username}
+            {u.is_admin && (
+              <span className="ml-2 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                {u.is_principal_admin ? "PRINCIPAL ADMIN" : "ADMIN"}
+              </span>
+            )}
+            {!u.is_verified && (
+              <span className="ml-2 text-xs font-semibold text-amber-600 dark:text-amber-400">UNVERIFIED</span>
+            )}
+            {u.is_locked && (
+              <span className="ml-2 text-xs font-semibold text-red-600 dark:text-red-400">LOCKED</span>
+            )}
+          </p>
+          {u.email && <p className="text-xs text-neutral-400">{u.email}</p>}
+          {u.phone && <p className="text-xs text-neutral-400">{u.phone}</p>}
+          <p className="text-xs text-neutral-400 mt-1">
+            joined {new Date(u.created_at).toLocaleDateString()} · ref {u.referral_code}
+            {u.mfa_enabled && " · MFA on"}
+          </p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          {u.is_locked ? (
+            <ActionButton tone="approve" disabled={busy} onClick={doUnlock}>
+              Unlock
+            </ActionButton>
+          ) : (
+            <ActionButton tone="reject" disabled={busy} onClick={doLock}>
+              Lock
+            </ActionButton>
+          )}
+          <ActionButton tone="reject" disabled={busy} onClick={doDelete}>
+            Delete
+          </ActionButton>
+        </div>
+      </div>
+      {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
+    </Card>
+  );
+}
+
+function UsersTab({ token }) {
+  const [users, setUsers] = useState(null);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
+  const [verifiedFilter, setVerifiedFilter] = useState("all"); // all | verified | unverified
+  const [lockedFilter, setLockedFilter] = useState("all"); // all | locked | unlocked
+
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      const filters = {};
+      if (search.trim()) filters.q = search.trim();
+      if (verifiedFilter !== "all") filters.verified = verifiedFilter === "verified";
+      if (lockedFilter !== "all") filters.locked = lockedFilter === "locked";
+      setUsers(await listAllUsers(token, filters));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Failed to load users");
+    }
+  }, [token, search, verifiedFilter, lockedFilter]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex flex-wrap gap-2 items-center">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && load()}
+            placeholder="Search username or email…"
+            className="flex-1 min-w-[180px] rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-3 py-1.5 text-sm"
+          />
+          <select
+            value={verifiedFilter}
+            onChange={(e) => setVerifiedFilter(e.target.value)}
+            className="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-2 py-1.5 text-sm"
+          >
+            <option value="all">All verification</option>
+            <option value="verified">Verified</option>
+            <option value="unverified">Unverified</option>
+          </select>
+          <select
+            value={lockedFilter}
+            onChange={(e) => setLockedFilter(e.target.value)}
+            className="rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-2 py-1.5 text-sm"
+          >
+            <option value="all">All lock status</option>
+            <option value="locked">Locked</option>
+            <option value="unlocked">Not locked</option>
+          </select>
+          <ActionButton tone="neutral" onClick={load}>
+            Apply
+          </ActionButton>
+        </div>
+      </Card>
+
+      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {users === null && !error && <p className="text-sm text-neutral-400">Loading…</p>}
+      {users !== null && users.length === 0 && <p className="text-sm text-neutral-400">No matching users.</p>}
+      {users !== null && (
+        <div className="space-y-3">
+          {users.map((u) => (
+            <UserRow key={u.username} u={u} token={token} onChanged={load} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotificationComposer({ token, onSent }) {
+  const [mode, setMode] = useState("unicast"); // unicast | multicast | broadcast
+  const [usernamesInput, setUsernamesInput] = useState("");
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [alsoEmail, setAlsoEmail] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const payload = { title, message, also_email: alsoEmail, broadcast: mode === "broadcast" };
+      if (mode !== "broadcast") {
+        const usernames = usernamesInput
+          .split(",")
+          .map((u) => u.trim())
+          .filter(Boolean);
+        if (mode === "unicast" && usernames.length !== 1) {
+          throw new ApiError(400, "Unicast needs exactly one username");
+        }
+        payload.usernames = usernames;
+      }
+      const res = await sendAdminNotification(token, payload);
+      setResult(res);
+      setTitle("");
+      setMessage("");
+      setUsernamesInput("");
+      onSent();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Failed to send notification");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <p className="font-medium mb-3">Send a notification</p>
+      <form onSubmit={submit} className="space-y-3">
+        <div className="flex gap-4 text-sm">
+          {["unicast", "multicast", "broadcast"].map((m) => (
+            <label key={m} className="flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" checked={mode === m} onChange={() => setMode(m)} />
+              {m === "unicast" ? "One user" : m === "multicast" ? "Several users" : "Everyone (broadcast)"}
+            </label>
+          ))}
+        </div>
+
+        {mode !== "broadcast" && (
+          <input
+            value={usernamesInput}
+            onChange={(e) => setUsernamesInput(e.target.value)}
+            placeholder={mode === "unicast" ? "username" : "username1, username2, username3…"}
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-3 py-1.5 text-sm"
+          />
+        )}
+
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Title"
+          maxLength={150}
+          required
+          className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-3 py-1.5 text-sm"
+        />
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Message"
+          maxLength={2000}
+          required
+          rows={3}
+          className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-3 py-1.5 text-sm"
+        />
+        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+          <input type="checkbox" checked={alsoEmail} onChange={(e) => setAlsoEmail(e.target.checked)} />
+          Also send via email (if the recipient has one on file)
+        </label>
+
+        <ActionButton tone="approve" disabled={busy}>
+          {busy ? "Sending…" : "Send"}
+        </ActionButton>
+      </form>
+
+      {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
+      {result && (
+        <p className="text-emerald-600 dark:text-emerald-400 text-xs mt-2">
+          Sent to {result.notified} recipient(s){result.emailed > 0 && `, emailed ${result.emailed}`}.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function NotificationsTab({ token }) {
+  const [sent, setSent] = useState(null);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      setSent(await listSentNotifications(token));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Failed to load notification history");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="space-y-4">
+      <NotificationComposer token={token} onSent={load} />
+
+      <div>
+        <p className="font-medium mb-2">Sent history</p>
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+        {sent === null && !error && <p className="text-sm text-neutral-400">Loading…</p>}
+        {sent !== null && sent.length === 0 && <p className="text-sm text-neutral-400">Nothing sent yet.</p>}
+        {sent !== null && (
+          <div className="space-y-2">
+            {sent.map((b) => (
+              <Card key={b.id}>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-sm">{b.title}</p>
+                  <span className="text-xs uppercase text-neutral-400">{b.audience}</span>
+                </div>
+                <p className="text-sm mt-1">{b.message}</p>
+                <p className="text-xs text-neutral-400 mt-1">
+                  {b.recipient_count} recipient(s) · sent by {b.sent_by} · {new Date(b.created_at).toLocaleString()}
+                  {b.also_email && ` · emailed ${b.emailed_count}`}
+                </p>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LogsTab({ token }) {
+  const [logs, setLogs] = useState(null);
+  const [error, setError] = useState(null);
+  const [actionFilter, setActionFilter] = useState("");
+  const [actorFilter, setActorFilter] = useState("");
+  const [targetFilter, setTargetFilter] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      const filters = {};
+      if (actionFilter.trim()) filters.action = actionFilter.trim();
+      if (actorFilter.trim()) filters.actor = actorFilter.trim();
+      if (targetFilter.trim()) filters.target = targetFilter.trim();
+      setLogs(await listAuditLogs(token, filters));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Failed to load audit log");
+    }
+  }, [token, actionFilter, actorFilter, targetFilter]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={actionFilter}
+            onChange={(e) => setActionFilter(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && load()}
+            placeholder="Action (e.g. user.locked)"
+            className="flex-1 min-w-[140px] rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-3 py-1.5 text-sm"
+          />
+          <input
+            value={actorFilter}
+            onChange={(e) => setActorFilter(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && load()}
+            placeholder="Actor"
+            className="flex-1 min-w-[140px] rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-3 py-1.5 text-sm"
+          />
+          <input
+            value={targetFilter}
+            onChange={(e) => setTargetFilter(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && load()}
+            placeholder="Target"
+            className="flex-1 min-w-[140px] rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-3 py-1.5 text-sm"
+          />
+          <ActionButton tone="neutral" onClick={load}>
+            Apply
+          </ActionButton>
+        </div>
+      </Card>
+
+      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {logs === null && !error && <p className="text-sm text-neutral-400">Loading…</p>}
+      {logs !== null && logs.length === 0 && <p className="text-sm text-neutral-400">No matching log entries.</p>}
+      {logs !== null && logs.length > 0 && (
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-neutral-100 dark:bg-neutral-800 text-left">
+              <tr>
+                <th className="px-3 py-2 font-medium">When</th>
+                <th className="px-3 py-2 font-medium">Actor</th>
+                <th className="px-3 py-2 font-medium">Action</th>
+                <th className="px-3 py-2 font-medium">Target</th>
+                <th className="px-3 py-2 font-medium">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((l) => (
+                <tr key={l.id} className="border-t border-neutral-200 dark:border-neutral-700">
+                  <td className="px-3 py-2 whitespace-nowrap text-xs text-neutral-400">
+                    {new Date(l.created_at).toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2">{l.actor}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{l.action}</td>
+                  <td className="px-3 py-2">{l.target || "—"}</td>
+                  <td className="px-3 py-2 text-neutral-400">{l.details || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -463,8 +943,7 @@ function AdminsTab({ token }) {
 
 export default function AdminDashboard() {
   const { user, accessToken, loading } = useAuth();
-  const [tab, setTab] = useState("payouts");
-  const tabs = user?.is_principal_admin ? [...TABS, PRINCIPAL_TAB] : TABS;
+  const [tab, setTab] = useState("overview");
 
   if (loading) return null;
 
@@ -478,16 +957,21 @@ export default function AdminDashboard() {
     );
   }
 
+  const canSee = (permission) => !permission || user.is_principal_admin || (user.admin_permissions || []).includes(permission);
+  const tabs = TABS_CONFIG.filter((t) => canSee(t.permission));
+  if (user.is_principal_admin) tabs.push(PRINCIPAL_TAB);
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id;
+
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10">
+    <div className="max-w-5xl mx-auto px-4 py-10">
       <h1 className="text-xl font-semibold mb-6">Admin dashboard</h1>
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 mb-6">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-              tab === t.id
+              activeTab === t.id
                 ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
                 : "bg-neutral-100 dark:bg-neutral-800"
             }`}
@@ -497,10 +981,14 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {tab === "payouts" && <PayoutsTab token={accessToken} />}
-      {tab === "places" && <PlacesTab token={accessToken} />}
-      {tab === "feedback" && <FeedbackTab token={accessToken} />}
-      {tab === "admins" && user.is_principal_admin && <AdminsTab token={accessToken} />}
+      {activeTab === "overview" && <OverviewTab token={accessToken} />}
+      {activeTab === "users" && <UsersTab token={accessToken} />}
+      {activeTab === "payouts" && <PayoutsTab token={accessToken} />}
+      {activeTab === "places" && <PlacesTab token={accessToken} />}
+      {activeTab === "feedback" && <FeedbackTab token={accessToken} />}
+      {activeTab === "notifications" && <NotificationsTab token={accessToken} />}
+      {activeTab === "logs" && <LogsTab token={accessToken} />}
+      {activeTab === "admins" && user.is_principal_admin && <AdminsTab token={accessToken} />}
     </div>
   );
 }
