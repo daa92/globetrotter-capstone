@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, ShieldCheck } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
+import { ADMIN_PATH } from "../../constants/adminPath";
 
 export default function Navbar() {
   const { t, i18n } = useTranslation();
@@ -34,6 +35,17 @@ export default function Navbar() {
           <Link to="/recommendations">{t("nav.recommendations")}</Link>
           <Link to="/itineraries">{t("nav.itineraries")}</Link>
           <Link to="/how-to-use">{t("nav.howToUse")}</Link>
+          {/* Only rendered for admins — purely a convenience shortcut once
+              you're already authenticated. The hidden ADMIN_PATH URL still
+              works too (e.g. before you're sure you're logged in), and the
+              real access control lives server-side regardless of which
+              way someone arrives at the page. */}
+          {user?.is_admin && (
+            <Link to={ADMIN_PATH} className="inline-flex items-center gap-1">
+              <ShieldCheck size={15} />
+              {t("nav.adminDashboard")}
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
