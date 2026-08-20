@@ -1,106 +1,3 @@
-"""
-app/routers/earnings.py
-
-Implements: "if a user uses the app at least 5 min/day, they earn $0.50/day"
-plus the referral bonus ($0.25/verified referral) and the payout system
-(min $30, requiring 5 referrals + 5 good-rated feedback submissions).
-
-Design notes:
-  - Activity is tracked via a lightweight heartbeat the frontend/CLI calls
-    periodically while the user is actively using the app (see
-    MAX_HEARTBEAT_INCREMENT_SECONDS in config — caps how much a single
-    call can add, so a client can't just claim "10000 seconds elapsed").
-  - Earnings are always *computed* from the underlying activity/referral/
-    payout records, never stored as a running balance — this avoids an
-    entire class of bugs where the balance and the records it's supposed
-    to represent drift out of sync, which matters a lot given Phase 1's
-    JSON storage has no transactions to keep two writes consistent.
-  - "Good feedback" = a feedback submission with rating >= GOOD_FEEDBACK_MIN_RATING.
-"""
-import uuid
-from datetime import datetime, timezone
-
-from fastapi import APIRouter, Depends, HTTPException, status
-
-from app import storage
-from app.config import settings
-from app.dependencies import get_current_user, require_permission
-from app.notifications.service import create_notification
-from app.schemas import (
-    DailyActivity,
-    EarningsResponse,
-    HeartbeatRequest,
-    PayoutEligibility,
-    PayoutRequestResult,
-    RequirementStatus,
-)
-
-router = APIRouter(tags=["earnings"])
-
-
-def _today_str() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
-
-
-@router.post("/users/me/activity/heartbeat")
-def heartbeat(payload: HeartbeatRequest, user: dict = Depends(get_current_user)):
-    elapsed = min(payload.elapsed_seconds, settings.MAX_HEARTBEAT_INCREMENT_SECONDS)
-    today = _today_str()
-
-    records = storage.read_all(storage.ACTIVITY_FILE)
-    existing = next((r for r in records if r["username"] == user["username"] and r["date"] == today), None)
-
-    if existing:
-        existing["active_seconds"] += elapsed
-        storage.replace_all(storage.ACTIVITY_FILE, records)
-        active_seconds = existing["active_seconds"]
-    else:
-        active_seconds = elapsed
-        storage.append(storage.ACTIVITY_FILE, {
-            "username": user["username"], "date": today, "active_seconds": active_seconds,
-        })
-
-    return {
-        "date": today,
-        "active_seconds": active_seconds,
-        "threshold_seconds": settings.DAILY_USAGE_THRESHOLD_SECONDS,
-        "threshold_met": active_seconds >= settings.DAILY_USAGE_THRESHOLD_SECONDS,
-    }
-
-
-def _compute_earnings(username: str) -> dict:
-    activity = [r for r in storage.read_all(storage.ACTIVITY_FILE) if r["username"] == username]
-    activity.sort(key=lambda r: r["date"])
-
-    daily_log = [
-        DailyActivity(
-            date=r["date"],
-            active_seconds=r["active_seconds"],
-            qualified=r["active_seconds"] >= settings.DAILY_USAGE_THRESHOLD_SECONDS,
-        )
-        for r in activity
-    ]
-    qualifying_days = sum(1 for d in daily_log if d.qualified)
-    usage_earnings = round(qualifying_days * settings.DAILY_USAGE_BONUS_USD, 2)
-
-    referrals = [r for r in storage.read_all(storage.REFERRALS_FILE) if r["sponsor_username"] == username]
-    referral_count = len(referrals)
-    referral_earnings = round(sum(r["amount_usd"] for r in referrals), 2)
-
-    feedback = [f for f in storage.read_all(storage.FEEDBACK_FILE) if f["username"] == username]
-    good_feedback_count = sum(1 for f in feedback if (f.get("rating") or 0) >= settings.GOOD_FEEDBACK_MIN_RATING)
-
-    total_earned = round(usage_earnings + referral_earnings, 2)
-
-    payouts = [p for p in storage.read_all(storage.PAYOUTS_FILE) if p["username"] == username]
-    total_paid_out = round(sum(p["amount_usd"] for p in payouts if p["status"] == "approved"), 2)
-    has_pending_payout = any(p["status"] == "pending" for p in payouts)
-
-    available_usd = round(total_earned - total_paid_out, 2)
-    available_fcfa = round(available_usd * settings.FCFA_PER_USD, 2)
-
-    today = _today_str()
-    today_record = next((r for r in activity if r["date"] == today), None)
     today_active_seconds = today_record["active_seconds"] if today_record else 0
 
     eligibility = PayoutEligibility(
@@ -197,6 +94,7 @@ def approve_payout(payout_id: str, admin: dict = Depends(require_permission("pay
     if not payout:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Payout request not found")
     storage.update_one(storage.PAYOUTS_FILE, "id", payout_id, {"status": "approved"})
+    audit.log_action(admin["username"], "payout.approved", target=payout["username"], details=f"${payout['amount_usd']}")
     create_notification(
         username=payout["username"],
         title="Payout approved",
@@ -213,6 +111,7 @@ def reject_payout(payout_id: str, admin: dict = Depends(require_permission("payo
     if not payout:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Payout request not found")
     storage.update_one(storage.PAYOUTS_FILE, "id", payout_id, {"status": "rejected"})
+    audit.log_action(admin["username"], "payout.rejected", target=payout["username"], details=f"${payout['amount_usd']}")
     create_notification(
         username=payout["username"],
         title="Payout request rejected",
