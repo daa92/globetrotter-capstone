@@ -31,6 +31,8 @@ ACTIVITY_FILE = "activity"
 REFERRALS_FILE = "referrals"
 PAYOUTS_FILE = "payouts"
 NOTIFICATIONS_FILE = "notifications"
+NOTIFICATION_BATCHES_FILE = "notification_batches"
+AUDIT_LOG_FILE = "audit_log"
 GEO_CACHE_FILE = "geo_cache"
 
 # A process-local lock still guards read-modify-write sequences, matching
