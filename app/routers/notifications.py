@@ -12,15 +12,20 @@ or all)."
   POST   /notifications/delete          -> {ids:[...]} or {all:true} (bulk)
 
   POST   /admin/notifications/send      -> admin pushes to specific users
-                                            or everyone, optionally also by email
+                                            (unicast: one username, multicast:
+                                            several) or everyone (broadcast)
+  GET    /admin/notifications/sent      -> history of admin-sent batches
 """
+import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app import storage
+from app import audit, storage
 from app.dependencies import get_current_user, require_permission
 from app.notifications import outbox
 from app.notifications.service import create_for_many
-from app.schemas import AdminSendNotificationRequest, NotificationBatchAction, NotificationOut
+from app.schemas import AdminSendNotificationRequest, NotificationBatchAction, NotificationBatchOut, NotificationOut
 
 router = APIRouter(tags=["notifications"])
 
@@ -109,4 +114,34 @@ def admin_send_notification(payload: AdminSendNotificationRequest, admin: dict =
                 outbox.send(to=u["email"], subject=payload.title, body=payload.message)
                 emailed += 1
 
+    audience = "broadcast" if payload.broadcast else ("unicast" if len(usernames) == 1 else "multicast")
+    batch = {
+        "id": str(uuid.uuid4()),
+        "title": payload.title,
+        "message": payload.message,
+        "audience": audience,
+        "recipient_count": len(usernames),
+        "sent_by": admin["username"],
+        "also_email": payload.also_email,
+        "emailed_count": emailed,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    storage.append(storage.NOTIFICATION_BATCHES_FILE, batch)
+    audit.log_action(
+        admin["username"], "notification.sent", target=audience,
+        details=f"'{payload.title}' to {len(usernames)} recipient(s)",
+    )
+
     return {"notified": len(created), "emailed": emailed}
+
+
+@router.get("/admin/notifications/sent", response_model=list[NotificationBatchOut])
+def list_sent_notifications(
+    limit: int = Query(default=100, ge=1, le=500),
+    admin: dict = Depends(require_permission("notifications")),
+):
+    """History of admin-sent notification batches (unicast/multicast/
+    broadcast), newest first — so sending isn't a one-way, unauditable action."""
+    batches = storage.read_all(storage.NOTIFICATION_BATCHES_FILE)
+    batches.sort(key=lambda b: b["created_at"], reverse=True)
+    return [NotificationBatchOut(**b) for b in batches[:limit]]
