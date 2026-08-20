@@ -186,7 +186,7 @@ export const listAllFeedback = (token) => request("/feedback", { token });
 // shows/hides.
 // ---------------------------------------------------------------------------
 
-export const ADMIN_PERMISSIONS = ["payouts", "places", "feedback", "notifications"];
+export const ADMIN_PERMISSIONS = ["payouts", "places", "feedback", "notifications", "users", "logs"];
 
 export const listAdmins = (token) => request("/admin/admins", { token });
 export const searchUsersForPromotion = (token, q) =>
@@ -197,3 +197,31 @@ export const updateAdminPermissions = (token, username, permissions) =>
   request(`/admin/admins/${username}/permissions`, { method: "PATCH", token, body: { permissions } });
 export const revokeAdmin = (token, username) =>
   request(`/admin/admins/${username}/revoke`, { method: "POST", token });
+
+// ---------------------------------------------------------------------------
+// Admin: full user directory, lock/unlock/delete, audit log, system overview
+// ---------------------------------------------------------------------------
+
+export const listAllUsers = (token, filters = {}) =>
+  request("/admin/users", { token, params: filters });
+export const lockUser = (token, username, reason) =>
+  request(`/admin/users/${username}/lock`, { method: "POST", token, body: { reason } });
+export const unlockUser = (token, username) =>
+  request(`/admin/users/${username}/unlock`, { method: "POST", token });
+export const deleteUser = (token, username) =>
+  request(`/admin/users/${username}`, { method: "DELETE", token });
+
+export const listAuditLogs = (token, filters = {}) =>
+  request("/admin/logs", { token, params: filters });
+
+export const getSystemOverview = (token) => request("/admin/overview", { token });
+
+// ---------------------------------------------------------------------------
+// Admin: notification history (unicast/multicast/broadcast batches already
+// sent, via the existing POST /admin/notifications/send above)
+// ---------------------------------------------------------------------------
+
+export const sendAdminNotification = (token, payload) =>
+  request("/admin/notifications/send", { method: "POST", token, body: payload });
+export const listSentNotifications = (token, limit = 100) =>
+  request("/admin/notifications/sent", { token, params: { limit } });
