@@ -23,6 +23,7 @@ from google.auth.exceptions import GoogleAuthError
 from jose import JWTError
 
 from app import security, storage
+from app import audit
 from app import dependencies
 from app.config import settings
 from app.dependencies import get_current_user
@@ -129,6 +130,7 @@ def register(payload: UserRegister):
         "google_sub": None,
         "password_reset_token": None,
         "password_reset_expires_at": None,
+        "is_locked": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     storage.append(storage.USERS_FILE, user)
@@ -138,6 +140,8 @@ def register(payload: UserRegister):
         subject="Verify your GT account",
         body=_verification_email_html(payload.username, verification_token),
     )
+
+    audit.log_action("system", "user.registered", target=payload.username, details="via email")
 
     return RegisterResponse(**user)
 
@@ -174,6 +178,7 @@ def register_phone(payload: PhoneRegister):
         "google_sub": None,
         "password_reset_token": None,
         "password_reset_expires_at": None,
+        "is_locked": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     storage.append(storage.USERS_FILE, user)
@@ -188,6 +193,8 @@ def register_phone(payload: PhoneRegister):
             f"{verification_token}"
         ),
     )
+
+    audit.log_action("system", "user.registered", target=payload.username, details="via phone")
 
     return PhoneRegisterResponse(**user)
 
@@ -205,6 +212,7 @@ def verify_account(payload: VerifyRequest):
         storage.USERS_FILE, "username", user["username"],
         {"is_verified": True},
     )
+    audit.log_action("system", "user.verified", target=user["username"])
 
     # Credit the sponsor now, not at registration — an unverified referral
     # would just get deleted by the 30-minute cleanup job anyway, so this
@@ -239,7 +247,15 @@ def _authenticate(username: str, password: str) -> dict:
 
 @router.post("/login")
 def login(payload: UserLogin, response: Response):
-    user = _authenticate(payload.username, payload.password)
+    try:
+        user = _authenticate(payload.username, payload.password)
+    except HTTPException:
+        audit.log_action("system", "login.failed", target=payload.username)
+        raise
+
+    if user.get("is_locked", False):
+        audit.log_action("system", "login.blocked_locked", target=user["username"])
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been locked. Contact support.")
 
     if not user.get("is_verified", False):
         raise HTTPException(
@@ -253,10 +269,12 @@ def login(payload: UserLogin, response: Response):
             # Password was correct but a second factor is required.
             return MFALoginChallenge(username=user["username"])
         if not security.verify_mfa_code(user["mfa_secret"], payload.mfa_code):
+            audit.log_action("system", "login.failed", target=user["username"], details="bad MFA code")
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid MFA code")
 
     access_token = security.create_access_token(user["username"])
     _set_refresh_cookie(response, user["username"])
+    audit.log_action(user["username"], "login.success")
     return TokenResponse(
         access_token=access_token,
         expires_in_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -309,6 +327,14 @@ def refresh(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired refresh token")
 
     username = payload["sub"]
+
+    users = storage.read_all(storage.USERS_FILE)
+    user = next((u for u in users if u["username"] == username), None)
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account no longer exists")
+    if user.get("is_locked", False):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been locked. Contact support.")
+
     access_token = security.create_access_token(username)
     _set_refresh_cookie(response, username)  # rotate refresh token
     return TokenResponse(access_token=access_token, expires_in_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -450,14 +476,19 @@ def google_login(payload: GoogleAuthRequest, response: Response):
             "google_sub": google_sub,
             "password_reset_token": None,
             "password_reset_expires_at": None,
+            "is_locked": False,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         storage.append(storage.USERS_FILE, user)
+        audit.log_action("system", "user.registered", target=username, details="via Google")
     elif not user.get("google_sub"):
         # Existing local-password account signing in with Google for the
         # first time, same email — link the two rather than duplicate.
         storage.update_one(storage.USERS_FILE, "username", user["username"], {"google_sub": google_sub})
         user["google_sub"] = google_sub
+
+    if user.get("is_locked", False):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been locked. Contact support.")
 
     if user.get("mfa_enabled"):
         if not payload.mfa_code:
@@ -516,5 +547,7 @@ def bootstrap_admin(payload: AdminBootstrapRequest):
     )
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such user")
+
+    audit.log_action("bootstrap", "admin.principal_created", target=payload.username)
 
     return {"detail": f"'{payload.username}' is now the principal admin"}
