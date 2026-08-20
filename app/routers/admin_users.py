@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app import storage
+from app import audit
 from app.dependencies import ADMIN_PERMISSIONS, get_current_principal_admin
 from app.schemas import AdminPermissionsUpdate, AdminPromoteRequest, AdminUserOut, UserSearchResult
 
@@ -90,6 +91,10 @@ def promote_admin(
         "admin_promoted_by": principal["username"],
     }
     storage.update_one(storage.USERS_FILE, "username", username, updates)
+    audit.log_action(
+        principal["username"], "admin.promoted", target=username,
+        details=f"permissions: {', '.join(permissions) or '(none)'}",
+    )
     return AdminUserOut(
         username=username,
         email=target.get("email"),
@@ -121,6 +126,10 @@ def update_admin_permissions(
 
     permissions = _validate_permissions(payload.permissions)
     storage.update_one(storage.USERS_FILE, "username", username, {"admin_permissions": permissions})
+    audit.log_action(
+        principal["username"], "admin.permissions_updated", target=username,
+        details=f"permissions: {', '.join(permissions) or '(none)'}",
+    )
     return AdminUserOut(
         username=username,
         email=target.get("email"),
@@ -152,4 +161,5 @@ def revoke_admin(username: str, principal: dict = Depends(get_current_principal_
         username,
         {"is_admin": False, "admin_permissions": [], "admin_promoted_at": None, "admin_promoted_by": None},
     )
+    audit.log_action(principal["username"], "admin.revoked", target=username)
     return {"detail": f"Admin access revoked for {username}"}
