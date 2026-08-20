@@ -100,6 +100,7 @@ class UserPublic(BaseModel):
     is_admin: bool = False
     is_principal_admin: bool = False
     admin_permissions: list[str] = Field(default_factory=list)
+    is_locked: bool = False
 
 
 class VerifyRequest(BaseModel):
@@ -308,7 +309,71 @@ class AdminPermissionsUpdate(BaseModel):
     permissions: list[str] = Field(description="Full replacement list of this admin's permissions")
 
 
+class NotificationBatchOut(BaseModel):
+    id: str
+    title: str
+    message: str
+    audience: str  # unicast | multicast | broadcast
+    recipient_count: int
+    sent_by: str
+    also_email: bool
+    emailed_count: int
+    created_at: str
+
+
 class UserSearchResult(BaseModel):
     username: str
     email: Optional[EmailStr] = None
     is_admin: bool
+
+
+# ---------------------------------------------------------------------------
+# Admin: full user directory + lock/unlock/delete (any admin with the
+# "users" permission; locking/deleting an admin account is principal-only)
+# ---------------------------------------------------------------------------
+
+class AdminUserDetail(BaseModel):
+    username: str
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    is_verified: bool
+    is_locked: bool
+    is_admin: bool
+    is_principal_admin: bool
+    admin_permissions: list[str] = Field(default_factory=list)
+    mfa_enabled: bool
+    created_at: str
+    referral_code: str
+
+
+class AdminLockRequest(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+# ---------------------------------------------------------------------------
+# Admin: audit log + system overview
+# ---------------------------------------------------------------------------
+
+class AuditLogEntry(BaseModel):
+    id: str
+    actor: str
+    action: str
+    target: Optional[str] = None
+    details: Optional[str] = None
+    created_at: str
+
+
+class SystemOverview(BaseModel):
+    total_users: int
+    verified_users: int
+    unverified_users: int
+    locked_users: int
+    total_admins: int
+    pending_payouts: int
+    approved_payouts_total_usd: float
+    pending_place_submissions: int
+    total_feedback: int
+    average_feedback_rating: Optional[float]
+    notifications_sent_last_7d: int
+    new_registrations_last_7d: int
+    background_jobs: list[dict]
