@@ -30,7 +30,7 @@ from app.security import decode_token_of_type
 # truth so the management endpoints can validate incoming permission lists
 # against it, and the frontend's "manage admins" tab can stay in sync with
 # whatever's actually enforceable server-side.
-ADMIN_PERMISSIONS = {"payouts", "places", "feedback", "notifications"}
+ADMIN_PERMISSIONS = {"payouts", "places", "feedback", "notifications", "users", "logs"}
 
 # tokenUrl is only used to populate Swagger UI's "Authorize" button.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
@@ -58,6 +58,15 @@ def get_current_user(token: str | None = Depends(oauth2_scheme)) -> dict:
     user = next((u for u in users if u["username"] == username), None)
     if user is None:
         raise credentials_exception
+
+    if user.get("is_locked", False):
+        # Re-checked on every request (not just at login) so a lock takes
+        # effect immediately, even against an access token issued minutes
+        # ago that hasn't naturally expired yet.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has been locked. Contact support.",
+        )
 
     return user
 
