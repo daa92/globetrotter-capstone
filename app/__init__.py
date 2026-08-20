@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.cleanup import run_cleanup_loop
 from app.config import settings
 from app.db import init_db
-from app.routers import auth, admin_users, destinations, earnings, feedback, geo, itineraries, notifications, places, recommendations, users
+from app.routers import auth, admin_users, admin_overview, destinations, earnings, feedback, geo, itineraries, notifications, places, recommendations, users
 
 logger = logging.getLogger("gt.app")
 
@@ -55,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(users.router)
     app.include_router(admin_users.router)
+    app.include_router(admin_overview.router)
     app.include_router(destinations.router)
     app.include_router(recommendations.router)
     app.include_router(itineraries.router)
