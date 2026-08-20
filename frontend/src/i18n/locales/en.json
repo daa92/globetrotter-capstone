@@ -8,7 +8,8 @@
     "login": "Log in",
     "register": "Sign up",
     "profile": "Profile",
-    "logout": "Log out"
+    "logout": "Log out",
+    "adminDashboard": "Admin dashboard"
   },
   "home": {
     "tagline": "Discover Cameroon, one place at a time.",
