@@ -9,7 +9,8 @@
     "register": "Sign up",
     "profile": "Profile",
     "logout": "Log out",
-    "adminDashboard": "Admin dashboard"
+    "adminDashboard": "Admin dashboard",
+    "myPlaces": "My places"
   },
   "home": {
     "tagline": "Discover Cameroon, one place at a time.",
@@ -272,5 +273,39 @@
     "loginRequired": "Log in to send feedback.",
     "loginLink": "Log in",
     "close": "Close"
+  },
+  "places": {
+    "myPlaces": "My places",
+    "addPlace": "Add a place",
+    "loading": "Loading…",
+    "noneYet": "You haven't added any places yet.",
+    "edit": "Edit",
+    "delete": "Delete",
+    "name": "Name",
+    "region": "Region",
+    "description": "Description",
+    "descriptionPlaceholder": "What's it about, what can you do there...",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "avgCost": "Avg cost (FCFA)",
+    "tags": "Tags",
+    "priceList": "Prices (optional)",
+    "addPriceItem": "Add item",
+    "itemName": "Item / product",
+    "media": "Photos / video (optional, 10MB combined max)",
+    "chooseFiles": "Choose photos or a video",
+    "uploading": "Uploading…",
+    "submit": "Submit place",
+    "saveChanges": "Save changes",
+    "cancel": "Cancel",
+    "overSizeLimit": "over the limit, remove a file",
+    "hasExistingVideo": "Video attached",
+    "adminAutoPublish": "As an admin, this publishes immediately — no approval needed.",
+    "editRevertsToPending": "Editing a live place sends it back for admin re-approval.",
+    "status": {
+      "pending": "Pending review",
+      "approved": "Live",
+      "rejected": "Rejected"
+    }
   }
 }
