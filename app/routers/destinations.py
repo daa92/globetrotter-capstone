@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app import enrichment, storage
+from app import enrichment, seeding, storage
 from app.audit import log_action
 from app.dependencies import get_current_user, require_permission
 from app.schemas import Destination, EnrichmentResult, VoteResponse
@@ -45,6 +45,14 @@ def search_destinations(
         return True
 
     return [Destination(**d) for d in destinations if matches(d)]
+
+
+# Declared BEFORE /{destination_id} below — otherwise FastAPI's
+# first-match routing would treat "seed-status" as a destination_id and
+# this route would never be reached.
+@router.get("/seed-status")
+def get_seed_status(admin: dict = Depends(require_permission("places"))):
+    return seeding.seed_status()
 
 
 @router.get("/{destination_id}", response_model=Destination)
@@ -201,3 +209,22 @@ def enrich_all_destinations(limit: int = Query(default=20, ge=1, le=100), admin:
             results.append({"id": d["id"], "name": d["name"], "status": "failed", "error": str(exc)})
 
     return {"processed": len(results), "remaining": max(0, len([x for x in destinations if not x.get("enriched_at")]) - len(results)), "results": results}
+
+
+# ---------------------------------------------------------------------------
+# Admin: seed the curated Cameroon starter catalogue (scripts/
+# cameroon_places_seed.py) straight from the dashboard — no shell access
+# anywhere required. Batched like enrich-all above and for the same
+# reason: a free-tier host's request timeout doesn't play well with a
+# few dozen enrichment calls in one HTTP request. (GET /seed-status is
+# declared earlier, above /{destination_id} — see the note up there.)
+# ---------------------------------------------------------------------------
+
+@router.post("/seed")
+def seed_destinations(limit: int = Query(default=5, ge=1, le=20), admin: dict = Depends(require_permission("places"))):
+    result = seeding.seed_batch(limit=limit)
+    log_action(
+        admin["username"], "destinations.seeded",
+        details=f"{result['processed']} imported this batch, {result['remaining']} remaining",
+    )
+    return result
