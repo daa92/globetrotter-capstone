@@ -10,6 +10,7 @@ import Itineraries from "../../pages/Itineraries";
 import Profile from "../../pages/Profile";
 import HowToUse from "../../pages/HowToUse";
 import Verify from "../../pages/Verify";
+import MyPlaces from "../../pages/MyPlaces";
 import AdminDashboard from "../../pages/AdminDashboard";
 import { ADMIN_PATH } from "../../constants/adminPath";
 
@@ -56,6 +57,7 @@ export default function AnimatedRoutes() {
         <Route path="/profile" element={<Page><Profile /></Page>} />
         <Route path="/how-to-use" element={<Page><HowToUse /></Page>} />
         <Route path="/verify" element={<Page><Verify /></Page>} />
+        <Route path="/my-places" element={<Page><MyPlaces /></Page>} />
         <Route path={ADMIN_PATH} element={<Page><AdminDashboard /></Page>} />
       </Routes>
     </AnimatePresence>
