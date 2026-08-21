@@ -1,6 +1,74 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
+import { Star, ThumbsUp, ThumbsDown, Play } from "lucide-react";
 import DestinationImage from "./DestinationImage";
+import { useAuth } from "../../context/AuthContext";
+import { likeDestination, dislikeDestination, ApiError } from "../../api/client";
+
+function RatingBadge({ rating }) {
+  if (rating == null) return null;
+  return (
+    <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-500">
+      <Star size={12} fill="currentColor" />
+      {rating.toFixed(1)}
+    </span>
+  );
+}
+
+function VoteButtons({ destination }) {
+  const { user, accessToken } = useAuth();
+  const [likes, setLikes] = useState(destination.likes ?? 0);
+  const [dislikes, setDislikes] = useState(destination.dislikes ?? 0);
+  const [busy, setBusy] = useState(false);
+
+  // Read-only display for logged-out visitors — voting needs an account,
+  // same rule as feedback (see FeedbackWidget), so no point offering
+  // buttons that will just 401.
+  if (!user) {
+    return (
+      <span className="inline-flex items-center gap-3 text-xs text-neutral-400">
+        <span className="inline-flex items-center gap-1"><ThumbsUp size={13} />{likes}</span>
+        <span className="inline-flex items-center gap-1"><ThumbsDown size={13} />{dislikes}</span>
+      </span>
+    );
+  }
+
+  const vote = async (e, kind) => {
+    e.stopPropagation(); // card itself is often clickable — don't trigger that too
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await (kind === "like" ? likeDestination : dislikeDestination)(accessToken, destination.id);
+      setLikes(result.likes);
+      setDislikes(result.dislikes);
+    } catch (err) {
+      // Silent — voting is a minor interaction, not worth an error banner on a card.
+      if (!(err instanceof ApiError)) throw err;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <span className="inline-flex items-center gap-3 text-xs">
+      <button
+        onClick={(e) => vote(e, "like")}
+        disabled={busy}
+        className="inline-flex items-center gap-1 text-neutral-500 hover:text-teal-600 dark:text-neutral-400 dark:hover:text-teal-400 disabled:opacity-50"
+      >
+        <ThumbsUp size={13} />{likes}
+      </button>
+      <button
+        onClick={(e) => vote(e, "dislike")}
+        disabled={busy}
+        className="inline-flex items-center gap-1 text-neutral-500 hover:text-red-500 dark:text-neutral-400 dark:hover:text-red-400 disabled:opacity-50"
+      >
+        <ThumbsDown size={13} />{dislikes}
+      </button>
+    </span>
+  );
+}
 
 /**
  * Renders either a curated destination (name, region, description, tags,
@@ -23,7 +91,15 @@ export default function DestinationCard({ destination, action, onClick, index = 
       onClick={onClick}
       className={`overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 transition hover:shadow-xl ${onClick ? "cursor-pointer" : ""}`}
     >
-      <DestinationImage destination={destination} className="h-44 w-full object-cover" />
+      <div className="relative">
+        <DestinationImage destination={destination} className="h-44 w-full object-cover" />
+        {destination.video_url && (
+          <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
+            <Play size={11} fill="currentColor" />
+            {t("explore.hasVideo", "Video")}
+          </span>
+        )}
+      </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold">{destination.name}</h3>
@@ -40,7 +116,10 @@ export default function DestinationCard({ destination, action, onClick, index = 
             {destination._distanceKm != null && ` · ${destination._distanceKm.toFixed(1)} km`}
           </p>
         ) : (
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">{destination.region}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 inline-flex items-center gap-2">
+            {destination.region}
+            <RatingBadge rating={destination.rating} />
+          </p>
         )}
 
         {destination.description && (
@@ -48,6 +127,13 @@ export default function DestinationCard({ destination, action, onClick, index = 
         )}
         {isLive && destination.address && (
           <p className="mt-2 line-clamp-1 text-sm text-neutral-600 dark:text-neutral-300">{destination.address}</p>
+        )}
+
+        {destination.how_to_get_there && (
+          <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+            {t("explore.fromCity", "From")} {destination.how_to_get_there.from}: ~{destination.how_to_get_there.distance_km} km
+            {destination.how_to_get_there.duration_minutes != null && ` (~${Math.round(destination.how_to_get_there.duration_minutes / 60)}h${destination.how_to_get_there.duration_minutes % 60}m)`}
+          </p>
         )}
 
         {destination.tags && (
@@ -62,6 +148,13 @@ export default function DestinationCard({ destination, action, onClick, index = 
             ))}
           </div>
         )}
+
+        {!isLive && destination.id && (
+          <div className="mt-3 flex items-center justify-between">
+            <VoteButtons destination={destination} />
+          </div>
+        )}
+
         {action && <div className="mt-3">{action}</div>}
       </div>
     </motion.div>
