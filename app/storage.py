@@ -34,6 +34,7 @@ NOTIFICATIONS_FILE = "notifications"
 NOTIFICATION_BATCHES_FILE = "notification_batches"
 AUDIT_LOG_FILE = "audit_log"
 GEO_CACHE_FILE = "geo_cache"
+DESTINATION_VOTES_FILE = "destination_votes"
 
 # A process-local lock still guards read-modify-write sequences, matching
 # the old file-based version's documented limitation (see its original
