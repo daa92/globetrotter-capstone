@@ -90,6 +90,49 @@ async function request(path, { method = "GET", body, token, params } = {}) {
   return data;
 }
 
+async function parseResponseOrThrow(resp) {
+  let data = null;
+  try {
+    const text = await resp.text();
+    data = text ? JSON.parse(text) : null;
+  } catch (e) {
+    // Keep data as null.
+  }
+  if (!resp.ok) {
+    let message = (data && (data.detail ?? data)) ?? resp.statusText ?? `HTTP ${resp.status}`;
+    if (typeof message === "object") {
+      try {
+        message = JSON.stringify(message);
+      } catch {
+        message = resp.statusText ?? `HTTP ${resp.status}`;
+      }
+    }
+    throw new ApiError(resp.status, message);
+  }
+  return data;
+}
+
+/**
+ * Multipart upload — deliberately separate from request() rather than
+ * teaching request() to sometimes send FormData, because the browser
+ * must set the multipart Content-Type header itself (it needs to embed
+ * a boundary value); manually setting "Content-Type: application/json"
+ * like request() always does would break the upload silently.
+ */
+export async function uploadPlaceMedia(token, files) {
+  const url = new URL("/places/upload-media", API_URL);
+  const formData = new FormData();
+  for (const file of files) formData.append("files", file);
+
+  const resp = await fetch(url.toString(), {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    credentials: "include",
+  });
+  return parseResponseOrThrow(resp);
+}
+
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
@@ -184,6 +227,10 @@ export const rejectPayout = (token, id) =>
 export const listPendingPlaces = (token) => request("/places/pending", { token });
 export const approvePlace = (token, id) => request(`/places/${id}/approve`, { method: "POST", token });
 export const rejectPlace = (token, id) => request(`/places/${id}/reject`, { method: "POST", token });
+export const submitPlace = (token, payload) => request("/places", { method: "POST", token, body: payload });
+export const editPlace = (token, id, payload) => request(`/places/${id}`, { method: "PATCH", token, body: payload });
+export const deletePlace = (token, id) => request(`/places/${id}`, { method: "DELETE", token });
+export const listMyPlaces = (token) => request("/places/mine", { token });
 
 export const submitFeedback = (token, payload) => request("/feedback", { method: "POST", token, body: payload });
 export const listAllFeedback = (token) => request("/feedback", { token });
