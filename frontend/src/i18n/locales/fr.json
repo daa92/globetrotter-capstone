@@ -9,7 +9,8 @@
     "register": "S'inscrire",
     "profile": "Profil",
     "logout": "Déconnexion",
-    "adminDashboard": "Tableau admin"
+    "adminDashboard": "Tableau admin",
+    "myPlaces": "Mes lieux"
   },
   "home": {
     "tagline": "Découvrez le Cameroun, un lieu à la fois.",
@@ -272,5 +273,39 @@
     "loginRequired": "Connectez-vous pour envoyer un avis.",
     "loginLink": "Connexion",
     "close": "Fermer"
+  },
+  "places": {
+    "myPlaces": "Mes lieux",
+    "addPlace": "Ajouter un lieu",
+    "loading": "Chargement…",
+    "noneYet": "Vous n'avez pas encore ajouté de lieu.",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "name": "Nom",
+    "region": "Région",
+    "description": "Description",
+    "descriptionPlaceholder": "De quoi s'agit-il, que peut-on y faire...",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "avgCost": "Coût moyen (FCFA)",
+    "tags": "Tags",
+    "priceList": "Prix (optionnel)",
+    "addPriceItem": "Ajouter un article",
+    "itemName": "Article / produit",
+    "media": "Photos / vidéo (optionnel, 10 Mo max au total)",
+    "chooseFiles": "Choisir des photos ou une vidéo",
+    "uploading": "Envoi en cours…",
+    "submit": "Soumettre le lieu",
+    "saveChanges": "Enregistrer",
+    "cancel": "Annuler",
+    "overSizeLimit": "dépasse la limite, retirez un fichier",
+    "hasExistingVideo": "Vidéo jointe",
+    "adminAutoPublish": "En tant qu'admin, ceci est publié immédiatement — aucune approbation requise.",
+    "editRevertsToPending": "Modifier un lieu en ligne le renvoie en attente de validation admin.",
+    "status": {
+      "pending": "En attente",
+      "approved": "En ligne",
+      "rejected": "Rejeté"
+    }
   }
 }
