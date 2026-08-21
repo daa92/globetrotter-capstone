@@ -17,6 +17,7 @@ import {
   approvePayout,
   approvePlace,
   deleteUser,
+  getSeedStatus,
   getSystemOverview,
   listAdmins,
   listAllFeedback,
@@ -31,6 +32,7 @@ import {
   rejectPlace,
   revokeAdmin,
   searchUsersForPromotion,
+  seedDestinations,
   sendAdminNotification,
   unlockUser,
   updateAdminPermissions,
@@ -142,6 +144,80 @@ function PayoutsTab({ token }) {
   );
 }
 
+function SeedCatalogueCard({ token }) {
+  const [status, setStatus] = useState(null); // { total_in_seed_list, already_imported, remaining }
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState(null);
+  const [log, setLog] = useState([]); // recent imported names, most recent first
+
+  const loadStatus = useCallback(async () => {
+    try {
+      setError(null);
+      setStatus(await getSeedStatus(token));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Couldn't check the starter catalogue status");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+
+  const runAll = async () => {
+    setRunning(true);
+    setError(null);
+    try {
+      // Keep going in small batches until nothing's left — mirrors the
+      // backend's own batching (a free-tier host doesn't like one giant
+      // request), but from here it just looks like one click to the admin.
+      let remaining = status?.remaining ?? Infinity;
+      while (remaining > 0) {
+        const batch = await seedDestinations(token, 5);
+        setLog((prev) => [
+          ...batch.results.map((r) => `${r.status === "ok" ? "✓" : "✗"} ${r.name}`).reverse(),
+          ...prev,
+        ]);
+        remaining = batch.remaining;
+        setStatus((prev) => ({ ...prev, remaining, already_imported: (prev?.already_imported ?? 0) + batch.processed }));
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Seeding stopped early — try clicking again to resume");
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  if (error && !status) return <Card><p className="text-red-500 text-sm">{error}</p></Card>;
+  if (!status) return <Card><p className="text-sm text-neutral-400">Checking starter catalogue…</p></Card>;
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <p className="font-medium">Starter destinations catalogue</p>
+          <p className="text-sm text-neutral-400 mt-0.5">
+            {status.already_imported} of {status.total_in_seed_list} curated Cameroon places are live.
+            {status.remaining > 0 ? ` ${status.remaining} not imported yet.` : " All imported."}
+          </p>
+        </div>
+        {status.remaining > 0 && (
+          <ActionButton tone="approve" disabled={running} onClick={runAll}>
+            {running ? "Seeding…" : `Seed ${status.remaining} remaining`}
+          </ActionButton>
+        )}
+      </div>
+      {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
+      {log.length > 0 && (
+        <div className="mt-3 max-h-40 overflow-y-auto text-xs font-mono text-neutral-400 space-y-0.5">
+          {log.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function PlacesTab({ token }) {
   const [places, setPlaces] = useState(null);
   const [error, setError] = useState(null);
@@ -172,35 +248,40 @@ function PlacesTab({ token }) {
     }
   };
 
-  if (error) return <p className="text-red-500 text-sm">{error}</p>;
-  if (places === null) return <p className="text-sm text-neutral-400">Loading…</p>;
-  if (places.length === 0) return <p className="text-sm text-neutral-400">No pending place submissions.</p>;
-
   return (
-    <div className="space-y-3">
-      {places.map((p) => (
-        <Card key={p.id}>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-medium">
-                {p.name} <span className="text-neutral-400 font-normal">· {p.region}</span>
-              </p>
-              <p className="text-sm text-neutral-400 max-w-xl">{p.description}</p>
-              <p className="text-xs text-neutral-400 mt-1">
-                submitted by {p.submitted_by} · {new Date(p.submitted_at).toLocaleString()}
-              </p>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <ActionButton tone="approve" disabled={busyId === p.id} onClick={() => act(p.id, "approve")}>
-                Approve
-              </ActionButton>
-              <ActionButton tone="reject" disabled={busyId === p.id} onClick={() => act(p.id, "reject")}>
-                Reject
-              </ActionButton>
-            </div>
-          </div>
-        </Card>
-      ))}
+    <div className="space-y-4">
+      <SeedCatalogueCard token={token} />
+
+      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {places === null && !error && <p className="text-sm text-neutral-400">Loading…</p>}
+      {places !== null && places.length === 0 && <p className="text-sm text-neutral-400">No pending place submissions.</p>}
+      {places !== null && places.length > 0 && (
+        <div className="space-y-3">
+          {places.map((p) => (
+            <Card key={p.id}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-medium">
+                    {p.name} <span className="text-neutral-400 font-normal">· {p.region}</span>
+                  </p>
+                  <p className="text-sm text-neutral-400 max-w-xl">{p.description}</p>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    submitted by {p.submitted_by} · {new Date(p.submitted_at).toLocaleString()}
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <ActionButton tone="approve" disabled={busyId === p.id} onClick={() => act(p.id, "approve")}>
+                    Approve
+                  </ActionButton>
+                  <ActionButton tone="reject" disabled={busyId === p.id} onClick={() => act(p.id, "reject")}>
+                    Reject
+                  </ActionButton>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
