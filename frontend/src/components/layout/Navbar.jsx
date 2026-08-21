@@ -35,6 +35,7 @@ export default function Navbar() {
           <Link to="/recommendations">{t("nav.recommendations")}</Link>
           <Link to="/itineraries">{t("nav.itineraries")}</Link>
           <Link to="/how-to-use">{t("nav.howToUse")}</Link>
+          {isAuthenticated && <Link to="/my-places">{t("nav.myPlaces")}</Link>}
           {/* Only rendered for admins — purely a convenience shortcut once
               you're already authenticated. The hidden ADMIN_PATH URL still
               works too (e.g. before you're sure you're logged in), and the
