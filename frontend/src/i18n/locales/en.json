@@ -88,7 +88,9 @@
     "address": "Address",
     "phone": "Phone",
     "openingHours": "Opening hours",
-    "loadingDescription": "Looking up a description…"
+    "loadingDescription": "Looking up a description…",
+    "hasVideo": "Video",
+    "fromCity": "From"
   },
   "recommendations": {
     "title": "For you",
