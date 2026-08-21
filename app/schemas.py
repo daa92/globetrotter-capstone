@@ -139,6 +139,11 @@ class UserProfileUpdate(BaseModel):
 # Destinations / places
 # ---------------------------------------------------------------------------
 
+class PriceListItem(BaseModel):
+    item: str = Field(max_length=120)
+    price_fcfa: int = Field(ge=0)
+
+
 class Destination(BaseModel):
     id: str
     name: str
@@ -149,6 +154,7 @@ class Destination(BaseModel):
     latitude: float
     longitude: float
     avg_cost_fcfa: Optional[int] = None
+    price_list: list[PriceListItem] = Field(default_factory=list)
     submitted_by: Optional[str] = None  # None = official seed data
 
     # --- Content enrichment (see app/enrichment.py) ---
@@ -171,10 +177,36 @@ class PlaceSubmission(BaseModel):
     region: str
     tags: list[str] = Field(default_factory=list)
     description: str = Field(min_length=20, max_length=2000)
-    image_url: str
     latitude: float = Field(ge=1.5, le=13.5, description="Rough Cameroon latitude bounds")
     longitude: float = Field(ge=8.0, le=16.5, description="Rough Cameroon longitude bounds")
     avg_cost_fcfa: Optional[int] = Field(default=None, ge=0)
+    price_list: list[PriceListItem] = Field(default_factory=list, description="Individual priced items/products, e.g. menu prices")
+    # Media is optional ("images/videos/both/nothing") and comes from
+    # POST /places/upload-media, called before this — this endpoint just
+    # takes the resulting URLs, it never receives raw file bytes itself.
+    images: list[str] = Field(default_factory=list)
+    video_url: Optional[str] = None
+
+
+class PlaceUpdate(BaseModel):
+    """Same shape as PlaceSubmission but every field optional — PATCH
+    semantics, only supplied fields change."""
+    name: Optional[str] = None
+    region: Optional[str] = None
+    tags: Optional[list[str]] = None
+    description: Optional[str] = Field(default=None, min_length=20, max_length=2000)
+    latitude: Optional[float] = Field(default=None, ge=1.5, le=13.5)
+    longitude: Optional[float] = Field(default=None, ge=8.0, le=16.5)
+    avg_cost_fcfa: Optional[int] = Field(default=None, ge=0)
+    price_list: Optional[list[PriceListItem]] = None
+    images: Optional[list[str]] = None
+    video_url: Optional[str] = None
+
+
+class MediaUploadResponse(BaseModel):
+    images: list[str] = Field(default_factory=list)
+    video_url: Optional[str] = None
+    total_bytes: int
 
 
 # ---------------------------------------------------------------------------
@@ -409,3 +441,4 @@ class VoteResponse(BaseModel):
     likes: int
     dislikes: int
     your_vote: Optional[str] = None  # "like" | "dislike" | None
+
