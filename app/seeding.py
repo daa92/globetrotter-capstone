@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app import enrichment, storage
-from scripts.cameroon_places_seed import PLACES
+from app.cameroon_places_seed import PLACES
 
 
 def seed_status() -> dict:
