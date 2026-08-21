@@ -41,6 +41,22 @@ class Settings(BaseSettings):
     BREVO_API_KEY: str = ""
     BREVO_SENDER_EMAIL: str = ""
     BREVO_SENDER_NAME: str = "GlobeTrotter"
+
+    # --- Content enrichment (free-tier external APIs) ---
+    # Every key below is optional. Each enrichment source in app/enrichment.py
+    # checks its own key and simply skips itself (returns None/[]) if unset —
+    # so the app runs fine with zero of these configured, and you can add
+    # sources incrementally. See app/enrichment.py module docstring for what
+    # each source actually provides and why it was chosen.
+    UNSPLASH_ACCESS_KEY: str = ""
+    PEXELS_API_KEY: str = ""
+    OPENTRIPMAP_API_KEY: str = ""
+    OPENROUTESERVICE_API_KEY: str = ""
+    # Reference point "how to get there" distances are computed from —
+    # defaults to Douala (economic capital, main international airport).
+    REFERENCE_CITY_NAME: str = "Douala"
+    REFERENCE_CITY_LAT: float = 4.0511
+    REFERENCE_CITY_LON: float = 9.7679
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
