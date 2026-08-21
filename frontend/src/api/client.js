@@ -177,6 +177,9 @@ export const getMyDestinationVote = (token, id) => request(`/destinations/${id}/
 export const enrichDestination = (token, id) => request(`/destinations/${id}/enrich`, { method: "POST", token });
 export const enrichAllDestinations = (token, limit = 20) =>
   request("/destinations/enrich-all", { method: "POST", token, params: { limit } });
+export const getSeedStatus = (token) => request("/destinations/seed-status", { token });
+export const seedDestinations = (token, limit = 5) =>
+  request("/destinations/seed", { method: "POST", token, params: { limit } });
 export const getRecommendations = (token, limit) => request("/recommendations", { token, params: { limit } });
 export const getPoiCategories = () => request("/geo/poi-categories");
 export const searchPois = (category, lat, lon, radius_m) =>
