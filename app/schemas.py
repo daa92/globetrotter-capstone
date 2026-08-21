@@ -145,11 +145,25 @@ class Destination(BaseModel):
     region: str
     tags: list[str] = Field(default_factory=list)
     description: str
-    image_url: str
+    image_url: str  # primary/cover image — kept for backward compatibility
     latitude: float
     longitude: float
     avg_cost_fcfa: Optional[int] = None
     submitted_by: Optional[str] = None  # None = official seed data
+
+    # --- Content enrichment (see app/enrichment.py) ---
+    images: list[str] = Field(default_factory=list, description="Gallery — includes image_url plus any enriched photos")
+    video_url: Optional[str] = None
+    wiki_url: Optional[str] = None
+    kinds: list[str] = Field(default_factory=list, description="POI categories from OpenTripMap, e.g. 'natural', 'beaches'")
+    rating: Optional[float] = Field(default=None, description="0-5, from OpenTripMap's notability score — NOT a crowd rating, see enrichment.py")
+    how_to_get_there: Optional[dict] = None
+    enrichment_sources: list[str] = Field(default_factory=list)
+    enriched_at: Optional[str] = None
+
+    # --- First-party engagement (genuine GT user data, not external) ---
+    likes: int = 0
+    dislikes: int = 0
 
 
 class PlaceSubmission(BaseModel):
@@ -377,3 +391,21 @@ class SystemOverview(BaseModel):
     notifications_sent_last_7d: int
     new_registrations_last_7d: int
     background_jobs: list[dict]
+
+
+# ---------------------------------------------------------------------------
+# Content enrichment + first-party voting (see app/enrichment.py)
+# ---------------------------------------------------------------------------
+
+class EnrichmentResult(BaseModel):
+    destination_id: str
+    updated_fields: list[str]
+    sources_used: list[str]
+    destination: Destination
+
+
+class VoteResponse(BaseModel):
+    destination_id: str
+    likes: int
+    dislikes: int
+    your_vote: Optional[str] = None  # "like" | "dislike" | None
