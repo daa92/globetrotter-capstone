@@ -125,6 +125,15 @@ export const deleteMe = (token) => request("/users/me", { method: "DELETE", toke
 // ---------------------------------------------------------------------------
 
 export const searchDestinations = (params) => request("/destinations", { params });
+export const getDestination = (id) => request(`/destinations/${id}`);
+
+// Content enrichment + first-party voting (see app/enrichment.py)
+export const likeDestination = (token, id) => request(`/destinations/${id}/like`, { method: "POST", token });
+export const dislikeDestination = (token, id) => request(`/destinations/${id}/dislike`, { method: "POST", token });
+export const getMyDestinationVote = (token, id) => request(`/destinations/${id}/my-vote`, { token });
+export const enrichDestination = (token, id) => request(`/destinations/${id}/enrich`, { method: "POST", token });
+export const enrichAllDestinations = (token, limit = 20) =>
+  request("/destinations/enrich-all", { method: "POST", token, params: { limit } });
 export const getRecommendations = (token, limit) => request("/recommendations", { token, params: { limit } });
 export const getPoiCategories = () => request("/geo/poi-categories");
 export const searchPois = (category, lat, lon, radius_m) =>
