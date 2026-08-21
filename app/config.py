@@ -57,6 +57,18 @@ class Settings(BaseSettings):
     REFERENCE_CITY_NAME: str = "Douala"
     REFERENCE_CITY_LAT: float = 4.0511
     REFERENCE_CITY_LON: float = 9.7679
+
+    # --- Media uploads (Cloudinary free tier) ---
+    # User-submitted place photos/videos go here, not into the database —
+    # storing multi-MB binary blobs in TiDB rows would bloat the DB and
+    # slow down every read of that collection, and Cloudinary's free tier
+    # (25GB storage/bandwidth) is a proper fit for this. Unset by default;
+    # POST /places/upload-media returns a clear 503 until configured,
+    # rather than silently failing or storing something wrong.
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
+    MAX_PLACE_MEDIA_BYTES: int = 10 * 1024 * 1024  # 10 MB, combined across all files in one submission
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
