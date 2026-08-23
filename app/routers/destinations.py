@@ -16,10 +16,10 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app import enrichment, seeding, storage
+from app import enrichment, storage
 from app.audit import log_action
 from app.dependencies import get_current_user, require_permission
-from app.schemas import Destination, EnrichmentResult, VoteResponse
+from app.schemas import CommentCreate, CommentOut, Destination, EnrichmentResult, VoteResponse
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
@@ -45,14 +45,6 @@ def search_destinations(
         return True
 
     return [Destination(**d) for d in destinations if matches(d)]
-
-
-# Declared BEFORE /{destination_id} below — otherwise FastAPI's
-# first-match routing would treat "seed-status" as a destination_id and
-# this route would never be reached.
-@router.get("/seed-status")
-def get_seed_status(admin: dict = Depends(require_permission("places"))):
-    return seeding.seed_status()
 
 
 @router.get("/{destination_id}", response_model=Destination)
@@ -144,6 +136,48 @@ def get_my_vote(destination_id: str, user: dict = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
+# Comments — public to read, any logged-in user can post, owner or admin
+# can delete.
+# ---------------------------------------------------------------------------
+
+@router.get("/{destination_id}/comments", response_model=list[CommentOut])
+def list_comments(destination_id: str):
+    _get_destination_or_404(destination_id)
+    comments = [c for c in storage.read_all(storage.DESTINATION_COMMENTS_FILE) if c["destination_id"] == destination_id]
+    comments.sort(key=lambda c: c["created_at"], reverse=True)
+    return comments
+
+
+@router.post("/{destination_id}/comments", response_model=CommentOut, status_code=status.HTTP_201_CREATED)
+def add_comment(destination_id: str, payload: CommentCreate, user: dict = Depends(get_current_user)):
+    _get_destination_or_404(destination_id)
+    comment = {
+        "id": str(uuid.uuid4()),
+        "destination_id": destination_id,
+        "username": user["username"],
+        "message": payload.message,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    storage.append(storage.DESTINATION_COMMENTS_FILE, comment)
+    return comment
+
+
+@router.delete("/{destination_id}/comments/{comment_id}")
+def delete_comment(destination_id: str, comment_id: str, user: dict = Depends(get_current_user)):
+    comments = storage.read_all(storage.DESTINATION_COMMENTS_FILE)
+    comment = next((c for c in comments if c["id"] == comment_id and c["destination_id"] == destination_id), None)
+    if not comment:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Comment not found")
+    if comment["username"] != user["username"] and not user.get("is_admin", False):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only delete your own comments")
+
+    storage.delete_one(storage.DESTINATION_COMMENTS_FILE, "id", comment_id)
+    if user.get("is_admin", False) and comment["username"] != user["username"]:
+        log_action(user["username"], "comment.moderated", target=destination_id, details=f"removed comment by {comment['username']}")
+    return {"detail": "Comment deleted"}
+
+
+# ---------------------------------------------------------------------------
 # Admin: content enrichment from free external APIs (see app/enrichment.py)
 # ---------------------------------------------------------------------------
 
@@ -210,21 +244,3 @@ def enrich_all_destinations(limit: int = Query(default=20, ge=1, le=100), admin:
 
     return {"processed": len(results), "remaining": max(0, len([x for x in destinations if not x.get("enriched_at")]) - len(results)), "results": results}
 
-
-# ---------------------------------------------------------------------------
-# Admin: seed the curated Cameroon starter catalogue (scripts/
-# cameroon_places_seed.py) straight from the dashboard — no shell access
-# anywhere required. Batched like enrich-all above and for the same
-# reason: a free-tier host's request timeout doesn't play well with a
-# few dozen enrichment calls in one HTTP request. (GET /seed-status is
-# declared earlier, above /{destination_id} — see the note up there.)
-# ---------------------------------------------------------------------------
-
-@router.post("/seed")
-def seed_destinations(limit: int = Query(default=5, ge=1, le=20), admin: dict = Depends(require_permission("places"))):
-    result = seeding.seed_batch(limit=limit)
-    log_action(
-        admin["username"], "destinations.seeded",
-        details=f"{result['processed']} imported this batch, {result['remaining']} remaining",
-    )
-    return result
