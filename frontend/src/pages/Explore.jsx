@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { searchDestinations, getPoiCategories, searchPois, ApiError } from "../api/client";
@@ -13,6 +14,7 @@ const PAGE_SIZE = 10;
 
 export default function Explore() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [allDestinations, setAllDestinations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -215,7 +217,7 @@ export default function Explore() {
         ) : (
           <AnimatePresence mode="popLayout">
             {pagedResults.map((d, i) => (
-              <DestinationCard key={d.id} destination={d} index={i} onClick={() => setSelectedPlace(d)} />
+              <DestinationCard key={d.id} destination={d} index={i} onClick={() => navigate(`/destinations/${d.id}`)} />
             ))}
           </AnimatePresence>
         )}
