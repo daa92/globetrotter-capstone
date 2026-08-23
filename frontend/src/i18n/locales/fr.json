@@ -306,6 +306,13 @@
       "pending": "En attente",
       "approved": "En ligne",
       "rejected": "Rejeté"
-    }
+    },
+    "comments": "Commentaires",
+    "addComment": "Partagez votre avis…",
+    "send": "Envoyer",
+    "toComment": "pour laisser un commentaire.",
+    "noComments": "Pas encore de commentaire — soyez le premier.",
+    "notFound": "Lieu introuvable.",
+    "viewOnMap": "Voir sur la carte"
   }
 }
