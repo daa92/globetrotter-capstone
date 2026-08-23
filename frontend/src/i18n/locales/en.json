@@ -306,6 +306,13 @@
       "pending": "Pending review",
       "approved": "Live",
       "rejected": "Rejected"
-    }
+    },
+    "comments": "Comments",
+    "addComment": "Share your thoughts…",
+    "send": "Send",
+    "toComment": "to leave a comment.",
+    "noComments": "No comments yet — be the first.",
+    "notFound": "Place not found.",
+    "viewOnMap": "View on map"
   }
 }
