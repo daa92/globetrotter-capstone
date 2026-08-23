@@ -442,3 +442,15 @@ class VoteResponse(BaseModel):
     dislikes: int
     your_vote: Optional[str] = None  # "like" | "dislike" | None
 
+
+class CommentCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+
+
+class CommentOut(BaseModel):
+    id: str
+    destination_id: str
+    username: str
+    message: str
+    created_at: str
+
