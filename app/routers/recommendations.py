@@ -36,19 +36,29 @@ def get_recommendations(
     preferences = set(p.lower() for p in user.get("preferences", []))
     destinations = storage.read_all(storage.DESTINATIONS_FILE)
 
+    def rating_of(dest: dict) -> float:
+        # Unrated destinations sort last, not first — a missing rating
+        # isn't "worse than a 0-star place", it's just unknown, but for
+        # ranking purposes we still want rated places to lead.
+        return dest.get("rating") if dest.get("rating") is not None else -1
+
     scored = [
         (dest, _score(preferences, set(t.lower() for t in dest.get("tags", []))))
         for dest in destinations
     ]
 
-    # If the user has no preferences yet (cold start), fall back to
-    # returning the catalogue as-is rather than an empty list.
     if not preferences:
-        ranked = destinations[:limit]
+        # Cold start: no preference signal to rank by, so fall back to
+        # highest-rated first ("most graded to least graded") instead of
+        # arbitrary catalogue order.
+        ranked = sorted(destinations, key=rating_of, reverse=True)[:limit]
     else:
-        scored.sort(key=lambda pair: pair[1], reverse=True)
+        # Preference match is still the primary signal (that's the point
+        # of a recommendation engine), rating breaks ties among equally
+        # relevant results.
+        scored.sort(key=lambda pair: (pair[1], rating_of(pair[0])), reverse=True)
         ranked = [dest for dest, score in scored if score > 0][:limit]
         if not ranked:
-            ranked = destinations[:limit]  # nothing matched — don't leave the user empty-handed
+            ranked = sorted(destinations, key=rating_of, reverse=True)[:limit]  # nothing matched — don't leave the user empty-handed
 
     return [Destination(**d) for d in ranked]
