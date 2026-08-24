@@ -1,18 +1,73 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useRef, useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
-import { updateMe, deleteMe, ApiError } from "../api/client";
+import { updateMe, deleteMe, uploadProfilePicture, ApiError } from "../api/client";
 import EarningsDashboard from "../components/profile/EarningsDashboard";
 import NotificationCenter from "../components/notifications/NotificationCenter";
 
+function AvatarUploader({ user, accessToken, onUploaded }) {
+  const { t } = useTranslation();
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const { profile_picture_url } = await uploadProfilePicture(accessToken, file);
+      await onUploaded(profile_picture_url);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : t("profile.updateError"));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-4">
+      <div
+        className="h-20 w-20 shrink-0 overflow-hidden rounded-full border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-2xl font-semibold text-neutral-400"
+      >
+        {user.profile_picture_url ? (
+          <img src={user.profile_picture_url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          user.username?.[0]?.toUpperCase()
+        )}
+      </div>
+      <div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFile}
+          className="hidden"
+          id="avatar-upload"
+        />
+        <label
+          htmlFor="avatar-upload"
+          className="cursor-pointer inline-block rounded-lg border border-neutral-300 dark:border-neutral-600 px-4 py-2 text-sm font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+        >
+          {uploading ? t("profile.saving") : t("profile.changePhoto")}
+        </label>
+        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 function OverviewTab() {
   const { t } = useTranslation();
-  const { user, accessToken, refreshUser, logout } = useAuth();
+  const { user, accessToken, refreshUser, applyNewToken, logout } = useAuth();
   const navigate = useNavigate();
 
+  const [username, setUsername] = useState(user.username);
+  const [email, setEmail] = useState(user.email || "");
   const [preferences, setPreferences] = useState(user.preferences.join(", "));
-  const [profilePictureUrl, setProfilePictureUrl] = useState(user.profile_picture_url || "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
@@ -24,17 +79,32 @@ function OverviewTab() {
     setMessage(null);
     setError(null);
     try {
-      await updateMe(accessToken, {
+      const payload = {
         preferences: preferences.split(",").map((p) => p.trim()).filter(Boolean),
-        profile_picture_url: profilePictureUrl || null,
-      });
-      await refreshUser();
+      };
+      if (username !== user.username) payload.username = username;
+      if (email !== (user.email || "")) payload.email = email;
+
+      const result = await updateMe(accessToken, payload);
+
+      if (result.access_token) {
+        // Username changed — the old token is dead the moment the
+        // rename happened server-side, swap in the new one now.
+        await applyNewToken(result.access_token);
+      } else {
+        await refreshUser();
+      }
       setMessage(t("profile.profileUpdated"));
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : t("profile.updateError"));
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleAvatarUploaded = async () => {
+    await refreshUser();
+    setMessage(t("profile.profileUpdated"));
   };
 
   const handleDelete = async () => {
@@ -50,17 +120,11 @@ function OverviewTab() {
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5">
+        <AvatarUploader user={user} accessToken={accessToken} onUploaded={handleAvatarUploaded} />
+      </div>
+
+      <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 p-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-neutral-400">{t("profile.username")}</p>
-            <p className="font-medium">{user.username}</p>
-          </div>
-          {user.email && (
-            <div>
-              <p className="text-neutral-400">{t("profile.email")}</p>
-              <p className="font-medium">{user.email}</p>
-            </div>
-          )}
           {user.phone && (
             <div>
               <p className="text-neutral-400">{t("profile.phone")}</p>
@@ -89,6 +153,35 @@ function OverviewTab() {
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div>
+          <label htmlFor="profile-username" className="text-sm font-medium">{t("profile.username")}</label>
+          <input
+            id="profile-username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            minLength={3}
+            maxLength={32}
+            pattern="^[a-zA-Z0-9_.\-]+$"
+            className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600"
+          />
+          <p className="mt-1 text-xs text-neutral-400">{t("profile.usernameHint")}</p>
+        </div>
+
+        {user.email !== undefined && (
+          <div>
+            <label htmlFor="profile-email" className="text-sm font-medium">{t("profile.email")}</label>
+            <input
+              id="profile-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600"
+            />
+            <p className="mt-1 text-xs text-neutral-400">{t("profile.emailHint")}</p>
+          </div>
+        )}
+
+        <div>
           <label htmlFor="profile-preferences" className="text-sm font-medium">{t("profile.preferences")}</label>
           <input
             id="profile-preferences"
@@ -99,16 +192,7 @@ function OverviewTab() {
             className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600"
           />
         </div>
-        <div>
-          <label htmlFor="profile-picture-url" className="text-sm font-medium">{t("profile.profilePictureUrl")}</label>
-          <input
-            id="profile-picture-url"
-            type="url"
-            value={profilePictureUrl}
-            onChange={(e) => setProfilePictureUrl(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-transparent px-4 py-2 focus:outline-none focus:ring-2 focus:ring-teal-600"
-          />
-        </div>
+
         <button
           type="submit"
           disabled={saving}
@@ -150,13 +234,17 @@ function OverviewTab() {
 export default function Profile() {
   const { t } = useTranslation();
   const { user, accessToken, isAuthenticated, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState("Overview");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const TABS = [
     { key: "Overview", label: t("profile.tabOverview") },
     { key: "Earnings", label: t("profile.tabEarnings") },
     { key: "Notifications", label: t("profile.tabNotifications") },
   ];
+
+  const requestedTab = searchParams.get("tab");
+  const activeTab = TABS.some((tab) => tab.key === requestedTab) ? requestedTab : "Overview";
+  const setActiveTab = (key) => setSearchParams(key === "Overview" ? {} : { tab: key });
 
   if (!loading && !isAuthenticated) {
     return (
@@ -180,12 +268,12 @@ export default function Profile() {
     <section className="mx-auto max-w-4xl px-6 py-12">
       <h1 className="text-3xl font-bold">{t("profile.hi", { username: user.username })}</h1>
 
-      <div className="mt-6 flex gap-1 border-b border-neutral-200 dark:border-neutral-700">
+      <div className="mt-6 flex gap-1 border-b border-neutral-200 dark:border-neutral-700 overflow-x-auto">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 text-sm font-medium transition ${
+            className={`shrink-0 px-4 py-2 text-sm font-medium transition ${
               activeTab === tab.key
                 ? "border-b-2 text-neutral-900 dark:text-white"
                 : "text-neutral-400 hover:text-neutral-600"
