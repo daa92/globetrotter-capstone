@@ -313,6 +313,12 @@
     "toComment": "to leave a comment.",
     "noComments": "No comments yet — be the first.",
     "notFound": "Place not found.",
-    "viewOnMap": "View on map"
+    "viewOnMap": "View on map",
+    "adminEdit": "Edit (admin)",
+    "translatePlaceholder": "Enter the {{lang}} translation…",
+    "editingPrimary": "Editing the primary (English) description.",
+    "editingTranslation": "Editing the {{lang}} translation — the original stays untouched.",
+    "saving": "Saving…",
+    "confirmDelete": "Delete this destination? This can't be undone."
   }
 }
