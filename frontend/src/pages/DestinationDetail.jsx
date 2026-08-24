@@ -4,15 +4,20 @@ import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, ChevronRight, Star, ThumbsUp, ThumbsDown, MapPin,
-  Navigation, Trash2, Send, ArrowLeft, ExternalLink,
+  Navigation, Trash2, Send, ArrowLeft, ExternalLink, Pencil, Languages, X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import AnimatedCanopyBackground from "../components/layout/AnimatedCanopyBackground";
 import DestinationImage from "../components/destinations/DestinationImage";
 import {
   getDestination, likeDestination, dislikeDestination, getMyDestinationVote,
-  listComments, addComment, deleteComment, ApiError,
+  listComments, addComment, deleteComment, adminEditDestination, adminDeleteDestination, ApiError,
 } from "../api/client";
+
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "fr", label: "Français" },
+];
 
 // --- Gallery -----------------------------------------------------------
 
@@ -181,10 +186,119 @@ function Comments({ destinationId }) {
   );
 }
 
+// --- Admin edit panel ------------------------------------------------------
+
+function AdminEditPanel({ destination, onSaved, onClose }) {
+  const { t } = useTranslation();
+  const { accessToken } = useAuth();
+  const [descLang, setDescLang] = useState("en");
+  const [description, setDescription] = useState(destination.description);
+  const [name, setName] = useState(destination.name);
+  const [region, setRegion] = useState(destination.region);
+  const [avgCost, setAvgCost] = useState(destination.avg_cost_fcfa ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Switching the language selector loads whatever translation already
+  // exists for that language (or the primary text for "en"), so you're
+  // editing/reviewing the right version, not overwriting blind.
+  const switchLang = (code) => {
+    setDescLang(code);
+    setDescription(code === "en" ? destination.description : destination.description_translations?.[code] ?? "");
+  };
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = {
+        name, region,
+        avg_cost_fcfa: avgCost === "" ? null : parseInt(avgCost, 10),
+        description,
+        description_language: descLang,
+      };
+      const updated = await adminEditDestination(accessToken, destination.id, payload);
+      onSaved(updated);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : t("auth.genericError"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl bg-white dark:bg-neutral-900 shadow-xl p-5 sm:p-6 mb-6 border-2 border-goldhour-500/50">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-display text-lg font-semibold inline-flex items-center gap-2">
+          <Pencil size={16} />{t("places.adminEdit", "Edit (admin)")}
+        </h2>
+        <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600"><X size={18} /></button>
+      </div>
+
+      <form onSubmit={save} className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 mb-1">{t("places.name", "Name")}</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 mb-1">{t("places.region", "Region")}</label>
+            <input value={region} onChange={(e) => setRegion(e.target.value)} className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-medium text-neutral-500">{t("places.description", "Description")}</label>
+            <div className="inline-flex items-center gap-1.5 text-xs">
+              <Languages size={13} className="text-neutral-400" />
+              {LANGUAGES.map((l) => (
+                <button
+                  type="button"
+                  key={l.code}
+                  onClick={() => switchLang(l.code)}
+                  className={`px-2 py-0.5 rounded-full ${descLang === l.code ? "bg-canopy-500 text-white" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"}`}
+                >
+                  {l.label}
+                  {l.code !== "en" && destination.description_translations?.[l.code] && " ✓"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <textarea
+            rows={5}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={descLang !== "en" ? t("places.translatePlaceholder", "Enter the {{lang}} translation…", { lang: LANGUAGES.find((l) => l.code === descLang)?.label }) : ""}
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm"
+          />
+          <p className="mt-1 text-xs text-neutral-400">
+            {descLang === "en"
+              ? t("places.editingPrimary", "Editing the primary (English) description.")
+              : t("places.editingTranslation", "Editing the {{lang}} translation — the original stays untouched.", { lang: LANGUAGES.find((l) => l.code === descLang)?.label })}
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-neutral-500 mb-1">{t("places.avgCost", "Avg cost (FCFA)")}</label>
+          <input type="number" min={0} value={avgCost} onChange={(e) => setAvgCost(e.target.value)} className="w-40 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm" />
+        </div>
+
+        {error && <p className="text-sm text-red-500">{error}</p>}
+
+        <button type="submit" disabled={saving} className="rounded-lg bg-canopy-500 hover:bg-canopy-700 disabled:opacity-50 text-white px-4 py-2 text-sm font-medium">
+          {saving ? t("places.saving", "Saving…") : t("places.saveChanges", "Save changes")}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 // --- Page -----------------------------------------------------------------
 
 export default function DestinationDetail() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, accessToken } = useAuth();
@@ -194,6 +308,8 @@ export default function DestinationDetail() {
   const [likes, setLikes] = useState(0);
   const [dislikes, setDislikes] = useState(0);
   const [myVote, setMyVote] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     getDestination(id)
@@ -214,6 +330,17 @@ export default function DestinationDetail() {
     setLikes(result.likes);
     setDislikes(result.dislikes);
     setMyVote(result.your_vote);
+  };
+
+  const handleAdminDelete = async () => {
+    if (!window.confirm(t("places.confirmDelete", "Delete this destination? This can't be undone."))) return;
+    setDeleting(true);
+    try {
+      await adminDeleteDestination(accessToken, id);
+      navigate("/explore");
+    } catch {
+      setDeleting(false);
+    }
   };
 
   if (notFound) {
@@ -243,6 +370,14 @@ export default function DestinationDetail() {
       </div>
 
       <div className="relative mx-auto max-w-5xl px-4 sm:px-6 -mt-10 sm:-mt-14">
+        {editing && (
+          <AdminEditPanel
+            destination={destination}
+            onSaved={(updated) => { setDestination(updated); setEditing(false); }}
+            onClose={() => setEditing(false)}
+          />
+        )}
+
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Main column */}
           <div className="lg:col-span-2 rounded-2xl bg-white dark:bg-neutral-900 shadow-xl p-5 sm:p-8">
@@ -253,11 +388,23 @@ export default function DestinationDetail() {
                   <MapPin size={13} />{destination.region}
                 </p>
               </div>
-              {destination.rating != null && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-goldhour-400/15 text-goldhour-500 px-3 py-1 text-sm font-medium">
-                  <Star size={15} fill="currentColor" />{destination.rating.toFixed(1)}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {destination.rating != null && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-goldhour-400/15 text-goldhour-500 px-3 py-1 text-sm font-medium">
+                    <Star size={15} fill="currentColor" />{destination.rating.toFixed(1)}
+                  </span>
+                )}
+                {user?.is_admin && !editing && (
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setEditing(true)} className="p-1.5 rounded-lg text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800" aria-label={t("places.edit", "Edit")}>
+                      <Pencil size={16} />
+                    </button>
+                    <button onClick={handleAdminDelete} disabled={deleting} className="p-1.5 rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 disabled:opacity-50" aria-label={t("places.delete", "Delete")}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {destination.tags?.length > 0 && (
@@ -271,7 +418,7 @@ export default function DestinationDetail() {
             )}
 
             <p className="mt-5 text-neutral-700 dark:text-neutral-200 leading-relaxed whitespace-pre-line">
-              {destination.description}
+              {destination.description_translations?.[i18n.language] || destination.description}
             </p>
 
             {destination.wiki_url && (
