@@ -153,7 +153,10 @@
     "deleteConfirm": "Yes, delete my account",
     "cancel": "Cancel",
     "deleteAccountBtn": "Delete account",
-    "deleteError": "Could not delete your account."
+    "deleteError": "Could not delete your account.",
+    "changePhoto": "Change photo",
+    "usernameHint": "Letters, numbers, dots, underscores, hyphens — 3 to 32 characters. Changing this updates your login and everywhere your name appears.",
+    "emailHint": "Each email address can only be used by one account."
   },
   "earnings": {
     "totalEarned": "Total earned",
