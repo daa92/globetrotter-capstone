@@ -182,6 +182,10 @@ export const addComment = (token, id, message) =>
   request(`/destinations/${id}/comments`, { method: "POST", token, body: { message } });
 export const deleteComment = (token, id, commentId) =>
   request(`/destinations/${id}/comments/${commentId}`, { method: "DELETE", token });
+export const adminEditDestination = (token, id, payload) =>
+  request(`/destinations/${id}`, { method: "PATCH", token, body: payload });
+export const adminDeleteDestination = (token, id) =>
+  request(`/destinations/${id}`, { method: "DELETE", token });
 export const getRecommendations = (token, limit) => request("/recommendations", { token, params: { limit } });
 export const getPoiCategories = () => request("/geo/poi-categories");
 export const searchPois = (category, lat, lon, radius_m) =>
