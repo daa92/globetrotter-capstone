@@ -116,7 +116,7 @@ function PayoutsTab({ token }) {
 
   if (error) return <p className="text-red-500 text-sm">{error}</p>;
   if (payouts === null) return <p className="text-sm text-neutral-400">Loading…</p>;
-  if (payouts.length === 0) return <p className="text-sm text-neutral-400">No pending payout requests.</p>;
+  if (payouts.length === 0) return <p className="text-sm text-neutral-400">No pending payout requests yet.</p>;
 
   return (
     <div className="space-y-3">
@@ -254,7 +254,7 @@ function PlacesTab({ token }) {
 
       {error && <p className="text-red-500 text-sm">{error}</p>}
       {places === null && !error && <p className="text-sm text-neutral-400">Loading…</p>}
-      {places !== null && places.length === 0 && <p className="text-sm text-neutral-400">No pending place submissions.</p>}
+      {places !== null && places.length === 0 && <p className="text-sm text-neutral-400">No pending place submissions. Try adding some</p>}
       {places !== null && places.length > 0 && (
         <div className="space-y-3">
           {places.map((p) => (
@@ -302,7 +302,7 @@ function FeedbackTab({ token }) {
 
   if (error) return <p className="text-red-500 text-sm">{error}</p>;
   if (feedback === null) return <p className="text-sm text-neutral-400">Loading…</p>;
-  if (feedback.length === 0) return <p className="text-sm text-neutral-400">No feedback yet.</p>;
+  if (feedback.length === 0) return <p className="text-sm text-neutral-400">No feedback for now.</p>;
 
   return (
     <div className="space-y-3">
@@ -591,7 +591,7 @@ function NotificationComposer({ token, onSent }) {
 
   return (
     <Card>
-      <p className="font-medium mb-3">Send a notification</p>
+      <p className="font-medium mb-3">Send a/some notification(s)</p>
       <form onSubmit={submit} className="space-y-3">
         <div className="flex gap-4 text-sm">
           {["unicast", "multicast", "broadcast"].map((m) => (
@@ -630,7 +630,7 @@ function NotificationComposer({ token, onSent }) {
         />
         <label className="flex items-center gap-1.5 text-sm cursor-pointer">
           <input type="checkbox" checked={alsoEmail} onChange={(e) => setAlsoEmail(e.target.checked)} />
-          Also send via email (if the recipient has one on file)
+          Also send via Email box (if the recipient has one on file)
         </label>
 
         <ActionButton tone="approve" disabled={busy}>
@@ -1033,7 +1033,7 @@ export default function AdminDashboard() {
     // at this path for non-admins who happen to load it.
     return (
       <div className="max-w-lg mx-auto mt-24 text-center text-neutral-400">
-        <p>404 — page not found.</p>
+        <p>404  page not found.</p>
       </div>
     );
   }
