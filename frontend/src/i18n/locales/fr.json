@@ -153,7 +153,10 @@
     "deleteConfirm": "Oui, supprimer mon compte",
     "cancel": "Annuler",
     "deleteAccountBtn": "Supprimer le compte",
-    "deleteError": "Impossible de supprimer votre compte."
+    "deleteError": "Impossible de supprimer votre compte.",
+    "changePhoto": "Changer la photo",
+    "usernameHint": "Lettres, chiffres, points, tirets bas, tirets — 3 à 32 caractères. Le changer met à jour votre identifiant de connexion et partout où votre nom apparaît.",
+    "emailHint": "Chaque adresse e-mail ne peut être utilisée que par un seul compte."
   },
   "earnings": {
     "totalEarned": "Total gagné",
