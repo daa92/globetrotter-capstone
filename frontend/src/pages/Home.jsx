@@ -8,7 +8,7 @@ export default function Home() {
     <Hero>
       <h1 className="text-4xl md:text-6xl font-bold tracking-tight">{t("home.tagline")}</h1>
       <p className="mt-4 text-white/70 max-w-xl mx-auto">
-        Placeholder homepage copy — real content coming in the next design pass.
+        <!--Placeholder homepage copy — real content coming in the next design pass.-->
       </p>
       <Link
         to="/explore"
