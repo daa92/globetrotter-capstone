@@ -26,7 +26,7 @@ export default function Navbar() {
         <Link to="/" className="flex items-center gap-2">
           <img src="/logo/logo-full.png" alt="GTCam" className="h-10 w-10 rounded-xl" />
           <span className="text-lg font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-            Globe<span style={{ color: "#C9975C" }}>Trotter</span>
+            GT<span style={{ color: "#C9975C" }}>Cam</span>
           </span>
         </Link>
 
