@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app import enrichment, storage
 from app.audit import log_action
 from app.dependencies import get_current_user, require_permission
-from app.schemas import CommentCreate, CommentOut, Destination, EnrichmentResult, VoteResponse
+from app.schemas import AdminDestinationUpdate, CommentCreate, CommentOut, Destination, EnrichmentResult, VoteResponse
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
 
@@ -54,6 +54,71 @@ def get_destination(destination_id: str):
     if not match:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Destination not found")
     return Destination(**match)
+
+
+# ---------------------------------------------------------------------------
+# Admin: direct destination editing/deletion — covers EVERY destination,
+# including official seed data that was never a place submission (so
+# has no PLACES_FILE record at all) and places submitted by other
+# users. This is how translations get added (edit with
+# description_language set), and how an admin cleans up/corrects the
+# catalogue directly, without the approval-workflow concepts in
+# app/routers/places.py applying at all.
+# ---------------------------------------------------------------------------
+
+def _apply_description_update(existing_record: dict, updates: dict, payload) -> dict:
+    """Same behavior as places.py's version — kept as a separate copy
+    rather than a shared import to keep each router's admin-edit logic
+    self-contained and easy to reason about independently."""
+    description_language = getattr(payload, "description_language", None)
+    if "description" in updates and description_language and description_language.lower() != "en":
+        translations = dict(existing_record.get("description_translations", {}))
+        translations[description_language.lower()] = updates.pop("description")
+        updates["description_translations"] = translations
+    updates.pop("description_language", None)
+    return updates
+
+
+@router.patch("/{destination_id}", response_model=Destination)
+def admin_edit_destination(destination_id: str, payload: AdminDestinationUpdate, admin: dict = Depends(require_permission("places"))):
+    destination = _get_destination_or_404(destination_id)
+    updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items() if v is not None}
+    updates = _apply_description_update(destination, updates, payload)
+
+    if not updates:
+        return Destination(**destination)
+
+    storage.update_one(storage.DESTINATIONS_FILE, "id", destination_id, updates)
+
+    # Keep the PLACES_FILE record in sync too, if this destination came
+    # from a submission — otherwise a later place-side edit could
+    # silently clobber the admin's direct edit.
+    places = storage.read_all(storage.PLACES_FILE)
+    if any(p["id"] == destination_id for p in places):
+        storage.update_one(storage.PLACES_FILE, "id", destination_id, updates)
+
+    was_translation = "description_translations" in updates
+    log_action(
+        admin["username"], "destination.edited", target=destination_id,
+        details=f"added {payload.description_language} translation" if was_translation else f"fields: {', '.join(updates.keys())}",
+    )
+    return Destination(**_get_destination_or_404(destination_id))
+
+
+@router.delete("/{destination_id}")
+def admin_delete_destination(destination_id: str, admin: dict = Depends(require_permission("places"))):
+    destination = _get_destination_or_404(destination_id)
+    storage.delete_one(storage.DESTINATIONS_FILE, "id", destination_id)
+
+    # If it also has a PLACES_FILE submission record, remove that too —
+    # otherwise it'd still show up in the submitter's "My places" list
+    # pointing at a destination that no longer exists.
+    places = storage.read_all(storage.PLACES_FILE)
+    if any(p["id"] == destination_id for p in places):
+        storage.delete_one(storage.PLACES_FILE, "id", destination_id)
+
+    log_action(admin["username"], "destination.deleted", target=destination["name"])
+    return {"detail": f"'{destination['name']}' deleted"}
 
 
 # ---------------------------------------------------------------------------
