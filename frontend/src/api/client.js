@@ -133,6 +133,20 @@ export async function uploadPlaceMedia(token, files) {
   return parseResponseOrThrow(resp);
 }
 
+export async function uploadProfilePicture(token, file) {
+  const url = new URL("/users/me/profile-picture", API_URL);
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const resp = await fetch(url.toString(), {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    credentials: "include",
+  });
+  return parseResponseOrThrow(resp);
+}
+
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
