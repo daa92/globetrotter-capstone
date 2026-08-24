@@ -44,14 +44,14 @@ def _signature(params: dict[str, str]) -> str:
     return hashlib.sha1(to_sign.encode("utf-8")).hexdigest()
 
 
-def upload_file(content: bytes, filename: str, content_type: str) -> dict:
+def upload_file(content: bytes, filename: str, content_type: str, folder: str = "gt-places") -> dict:
     """Returns {"url": ..., "resource_type": "image"|"video", "bytes": int}. Raises MediaUploadError on failure."""
     if not is_configured():
         raise MediaUploadError("Media uploads aren't configured on this server yet")
 
     resource_type = "video" if content_type.startswith("video/") else "image"
     timestamp = str(int(time.time()))
-    params_to_sign = {"timestamp": timestamp, "folder": "gt-places"}
+    params_to_sign = {"timestamp": timestamp, "folder": folder}
     signature = _signature(params_to_sign)
 
     url = f"https://api.cloudinary.com/v1_1/{settings.CLOUDINARY_CLOUD_NAME}/{resource_type}/upload"
@@ -60,7 +60,7 @@ def upload_file(content: bytes, filename: str, content_type: str) -> dict:
             url,
             data={
                 "timestamp": timestamp,
-                "folder": "gt-places",
+                "folder": folder,
                 "api_key": settings.CLOUDINARY_API_KEY,
                 "signature": signature,
             },
