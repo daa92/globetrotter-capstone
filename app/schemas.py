@@ -149,7 +149,10 @@ class Destination(BaseModel):
     name: str
     region: str
     tags: list[str] = Field(default_factory=list)
-    description: str
+    description: str  # primary/default-language description
+    description_translations: dict[str, str] = Field(
+        default_factory=dict, description="Extra language versions, e.g. {'fr': '...'}. Primary `description` is the fallback for any language not present here."
+    )
     image_url: str  # primary/cover image — kept for backward compatibility
     latitude: float
     longitude: float
@@ -190,11 +193,43 @@ class PlaceSubmission(BaseModel):
 
 class PlaceUpdate(BaseModel):
     """Same shape as PlaceSubmission but every field optional — PATCH
-    semantics, only supplied fields change."""
+    semantics, only supplied fields change.
+
+    `description` + `description_language` work together: if
+    `description_language` is omitted (or equals the primary language,
+    "en"), `description` replaces the primary description as before. If
+    `description_language` is set to something else (e.g. "fr"), the
+    text is stored as a *translation* instead — the primary description
+    is untouched, and `description_translations[language]` is set. This
+    is how you can add a French translation without overwriting the
+    original text.
+    """
     name: Optional[str] = None
     region: Optional[str] = None
     tags: Optional[list[str]] = None
     description: Optional[str] = Field(default=None, min_length=20, max_length=2000)
+    description_language: Optional[str] = Field(default=None, description="ISO 639-1 code, e.g. 'fr'. Omit or 'en' to edit the primary description.")
+    latitude: Optional[float] = Field(default=None, ge=1.5, le=13.5)
+    longitude: Optional[float] = Field(default=None, ge=8.0, le=16.5)
+    avg_cost_fcfa: Optional[int] = Field(default=None, ge=0)
+    price_list: Optional[list[PriceListItem]] = None
+    images: Optional[list[str]] = None
+    video_url: Optional[str] = None
+
+
+class AdminDestinationUpdate(BaseModel):
+    """Direct admin edit of ANY destination — including official seed
+    data that never went through a place submission at all, and places
+    submitted by other users. Deliberately separate from PlaceUpdate:
+    PlaceUpdate operates on a PLACES_FILE submission record (owner-or-
+    admin, with the "edit reverts to pending" rule for non-admins);
+    this operates directly on the published DESTINATIONS_FILE record
+    and is admin-only, no approval concept involved."""
+    name: Optional[str] = None
+    region: Optional[str] = None
+    tags: Optional[list[str]] = None
+    description: Optional[str] = Field(default=None, min_length=20, max_length=2000)
+    description_language: Optional[str] = Field(default=None, description="ISO 639-1 code, e.g. 'fr'. Omit or 'en' to edit the primary description.")
     latitude: Optional[float] = Field(default=None, ge=1.5, le=13.5)
     longitude: Optional[float] = Field(default=None, ge=8.0, le=16.5)
     avg_cost_fcfa: Optional[int] = Field(default=None, ge=0)
@@ -453,4 +488,5 @@ class CommentOut(BaseModel):
     username: str
     message: str
     created_at: str
+
 
