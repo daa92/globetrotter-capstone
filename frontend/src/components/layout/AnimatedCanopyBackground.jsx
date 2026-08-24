@@ -43,21 +43,28 @@ export default function AnimatedCanopyBackground({ variant = "fixed", className 
           opacity: 0.55;
           will-change: transform;
         }
+        /* Sized/positioned off vmin (not vmax) and centered around the
+           middle of the viewport rather than pinned to corners — on a
+           tall narrow phone, vmax-based corner blobs land almost
+           entirely outside the visible area (this was the actual cause
+           of the hero looking flat/plain on mobile: the glow was
+           there, just off-screen). vmin scales sanely on both a
+           portrait phone and a widescreen TV. */
         .canopy-glow-1 {
-          width: 60vmax; height: 60vmax;
-          top: -15vmax; left: -10vmax;
+          width: 90vmin; height: 90vmin;
+          top: -25vmin; left: -20vmin;
           background: radial-gradient(circle, #1F7A4D 0%, transparent 70%);
           animation: canopyDrift1 34s ease-in-out infinite;
         }
         .canopy-glow-2 {
-          width: 50vmax; height: 50vmax;
-          bottom: -20vmax; right: -10vmax;
+          width: 80vmin; height: 80vmin;
+          bottom: -20vmin; right: -25vmin;
           background: radial-gradient(circle, #C1502E 0%, transparent 70%);
           animation: canopyDrift2 41s ease-in-out infinite;
         }
         .canopy-glow-3 {
-          width: 40vmax; height: 40vmax;
-          top: 30%; left: 50%;
+          width: 70vmin; height: 70vmin;
+          top: 35%; left: 50%;
           background: radial-gradient(circle, #E8B23D 0%, transparent 72%);
           opacity: 0.35;
           animation: canopyDrift3 28s ease-in-out infinite;
@@ -69,15 +76,15 @@ export default function AnimatedCanopyBackground({ variant = "fixed", className 
         }
         @keyframes canopyDrift1 {
           0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(8vmax, 6vmax) scale(1.15); }
+          50% { transform: translate(8vmin, 6vmin) scale(1.15); }
         }
         @keyframes canopyDrift2 {
           0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(-6vmax, -8vmax) scale(1.1); }
+          50% { transform: translate(-6vmin, -8vmin) scale(1.1); }
         }
         @keyframes canopyDrift3 {
           0%, 100% { transform: translate(-50%, 0) scale(1); }
-          50% { transform: translate(-50%, 4vmax) scale(1.2); }
+          50% { transform: translate(-50%, 4vmin) scale(1.2); }
         }
       `}</style>
     </div>
