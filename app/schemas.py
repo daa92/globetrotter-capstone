@@ -130,9 +130,23 @@ class PhoneRegisterResponse(UserPublic):
 
 
 class UserProfileUpdate(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_.-]+$")
     email: Optional[EmailStr] = None
     preferences: Optional[list[str]] = None
     profile_picture_url: Optional[str] = None
+
+
+class ProfileUpdateResponse(UserPublic):
+    # Only set when the username actually changed — the old access token
+    # embeds the old username as its subject, so it stops resolving to
+    # any account the moment the rename happens. The frontend must swap
+    # in this new token immediately or the user is silently logged out
+    # by their own edit.
+    access_token: Optional[str] = None
+
+
+class AvatarUploadResponse(BaseModel):
+    profile_picture_url: str
 
 
 # ---------------------------------------------------------------------------
