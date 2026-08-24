@@ -72,6 +72,20 @@ export function AuthProvider({ children }) {
     return loadCurrentUser(accessToken);
   }, [accessToken, loadCurrentUser]);
 
+  // Used after a username rename: the old access token's subject is the
+  // old username, so it stops resolving to any account the instant the
+  // rename happens server-side. The rename response carries a fresh
+  // token already scoped to the new username — swap it in immediately,
+  // or the very next authenticated request 401s the user out of their
+  // own edit.
+  const applyNewToken = useCallback(
+    async (newToken) => {
+      setAccessToken(newToken);
+      await loadCurrentUser(newToken);
+    },
+    [loadCurrentUser]
+  );
+
   const value = {
     user,
     accessToken,
@@ -81,6 +95,7 @@ export function AuthProvider({ children }) {
     loginWithGoogle,
     logout,
     refreshUser,
+    applyNewToken,
     register: api.register,
     registerPhone: api.registerPhone,
     verifyAccount: api.verifyAccount,
