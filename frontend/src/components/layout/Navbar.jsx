@@ -24,7 +24,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-black/5 dark:border-white/10 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-md">
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         <Link to="/" className="flex items-center gap-2">
-          <img src="/logo/logo-full.png" alt="GT — GlobeTrotter" className="h-10 w-10 rounded-xl" />
+          <img src="/logo/logo-full.png" alt="GTCam" className="h-10 w-10 rounded-xl" />
           <span className="text-lg font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
             Globe<span style={{ color: "#C9975C" }}>Trotter</span>
           </span>
