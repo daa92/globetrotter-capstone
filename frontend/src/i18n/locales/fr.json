@@ -313,6 +313,12 @@
     "toComment": "pour laisser un commentaire.",
     "noComments": "Pas encore de commentaire — soyez le premier.",
     "notFound": "Lieu introuvable.",
-    "viewOnMap": "Voir sur la carte"
+    "viewOnMap": "Voir sur la carte",
+    "adminEdit": "Modifier (admin)",
+    "translatePlaceholder": "Entrez la traduction en {{lang}}…",
+    "editingPrimary": "Modification de la description principale (anglais).",
+    "editingTranslation": "Modification de la traduction {{lang}} — l'original reste inchangé.",
+    "saving": "Enregistrement…",
+    "confirmDelete": "Supprimer cette destination ? Action irréversible."
   }
 }
