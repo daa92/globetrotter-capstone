@@ -78,7 +78,7 @@ export default function Navbar() {
         <Link to="/" className="flex min-w-0 items-center gap-2 shrink-0" onClick={() => setMenuOpen(false)}>
           <img src="/logo/logo-full.png" alt="GT — GlobeTrotter" className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl shrink-0" />
           <span className="truncate text-base sm:text-lg font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-            Globe<span style={{ color: "#C9975C" }}>Trotter</span>
+            GT<span style={{ color: "#C9975C" }}>Cam</span>
           </span>
         </Link>
 
