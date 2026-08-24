@@ -282,6 +282,15 @@ export const listAuditLogs = (token, filters = {}) =>
 export const getSystemOverview = (token) => request("/admin/overview", { token });
 
 // ---------------------------------------------------------------------------
+// Admin: seed the curated Cameroon starter catalogue (batched — see
+// POST /destinations/seed on the backend for why)
+// ---------------------------------------------------------------------------
+
+export const getSeedStatus = (token) => request("/destinations/seed-status", { token });
+export const seedDestinations = (token, limit = 5) =>
+  request("/destinations/seed", { method: "POST", token, params: { limit } });
+
+// ---------------------------------------------------------------------------
 // Admin: notification history (unicast/multicast/broadcast batches already
 // sent, via the existing POST /admin/notifications/send above)
 // ---------------------------------------------------------------------------
