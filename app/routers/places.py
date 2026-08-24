@@ -84,6 +84,14 @@ def submit_place(payload: PlaceSubmission, user: dict = Depends(get_current_user
     is_admin = user.get("is_admin", False)
     now = datetime.now(timezone.utc).isoformat()
 
+    # Prevent accidental duplicate submissions of the same real-world
+    # place (case-insensitive name match) — a clean 409 instead of
+    # silently creating a look-alike duplicate destination.
+    existing_names = {d["name"].strip().lower() for d in storage.read_all(storage.DESTINATIONS_FILE)}
+    existing_names |= {p["name"].strip().lower() for p in storage.read_all(storage.PLACES_FILE) if p["status"] != "rejected"}
+    if payload.name.strip().lower() in existing_names:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"A place named '{payload.name}' already exists. Edit the existing one instead of submitting a duplicate.")
+
     place = {
         "id": str(uuid.uuid4()),
         "status": "approved" if is_admin else "pending",
@@ -110,6 +118,7 @@ def _publish_to_destinations(place: dict) -> None:
         "region": place["region"],
         "tags": place["tags"],
         "description": place["description"],
+        "description_translations": place.get("description_translations", {}),
         "image_url": (place.get("images") or [""])[0],
         "images": place.get("images", []),
         "video_url": place.get("video_url"),
@@ -161,6 +170,21 @@ def _require_owner_or_admin(place: dict, user: dict) -> None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only edit or delete your own place submissions")
 
 
+def _apply_description_update(existing_record: dict, updates: dict, payload) -> dict:
+    """If payload.description_language is set to something other than
+    the primary language ("en"/unset), routes the new text into
+    description_translations instead of overwriting the primary
+    description — this is how a translation gets added without losing
+    the original. Mutates and returns `updates`."""
+    description_language = getattr(payload, "description_language", None)
+    if "description" in updates and description_language and description_language.lower() != "en":
+        translations = dict(existing_record.get("description_translations", {}))
+        translations[description_language.lower()] = updates.pop("description")
+        updates["description_translations"] = translations
+    updates.pop("description_language", None)  # never stored as its own field
+    return updates
+
+
 # ---------------------------------------------------------------------------
 # Edit — owner or admin. A non-admin owner editing an already-approved
 # place sends it back to pending (re-review), matching the rule that
@@ -175,6 +199,7 @@ def edit_place(place_id: str, payload: PlaceUpdate, user: dict = Depends(get_cur
 
     is_admin = user.get("is_admin", False)
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items() if v is not None}
+    updates = _apply_description_update(place, updates, payload)
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     was_approved = place["status"] == "approved"
