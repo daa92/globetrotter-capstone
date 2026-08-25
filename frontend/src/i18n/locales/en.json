@@ -120,7 +120,23 @@
     "destinationsCount": "{{count}} destination(s)",
     "loadError": "Could not load itineraries.",
     "createError": "Could not create the itinerary.",
-    "deleteError": "Could not delete the itinerary."
+    "deleteError": "Could not delete the itinerary.",
+    "vibeTitle": "What's your vibe?",
+    "vibeSubtitle": "Pick as many as you like — we'll narrow down destinations for you.",
+    "next": "Next",
+    "back": "Back",
+    "destTitle": "Pick your destinations",
+    "destSubtitle": "{{count}} selected",
+    "detailsTitle": "Almost there",
+    "detailsSubtitle": "Give it a name and pick your dates.",
+    "quickPick": "Quick pick",
+    "preset": {
+      "weekend": "Weekend (2 days)",
+      "week": "1 week",
+      "twoWeeks": "2 weeks"
+    },
+    "planNew": "Plan a new trip",
+    "trip": "Trip"
   },
   "profile": {
     "hi": "Hi, {{username}}",
@@ -256,7 +272,21 @@
     "guest_house": "Guest house",
     "airport": "Airport",
     "supermarket": "Supermarket",
-    "market": "Market"
+    "market": "Market",
+    "university": "University",
+    "attraction": "Attraction",
+    "park": "Park",
+    "gym": "Gym",
+    "library": "Library",
+    "courier": "Delivery / Courier",
+    "car_dealer": "Car Dealer",
+    "electronics": "Electronics",
+    "car_wash": "Car Wash",
+    "police": "Police",
+    "post_office": "Post Office",
+    "museum": "Museum",
+    "stadium": "Stadium",
+    "place_of_worship": "Place of Worship"
   },
   "feedback": {
     "buttonLabel": "Feedback",
