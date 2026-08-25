@@ -29,7 +29,16 @@ export class ApiError extends Error {
 async function request(path, { method = "GET", body, token, params } = {}) {
   const url = new URL(path, API_URL);
   if (params) {
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    // Skip undefined/null values — URLSearchParams.set() otherwise
+    // stringifies them as the literal text "undefined"/"null", which
+    // breaks any backend param typed as bool/int/etc (FastAPI can't
+    // parse "undefined" as a boolean). Callers that simply omit an
+    // optional argument (e.g. listNotifications(token) with no
+    // unread_only) should behave exactly like not sending that param
+    // at all, not send a broken one.
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) url.searchParams.set(k, v);
+    });
   }
 
   const headers = new Headers({
