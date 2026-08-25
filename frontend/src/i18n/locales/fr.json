@@ -120,7 +120,23 @@
     "destinationsCount": "{{count}} destination(s)",
     "loadError": "Impossible de charger les itinéraires.",
     "createError": "Impossible de créer l'itinéraire.",
-    "deleteError": "Impossible de supprimer l'itinéraire."
+    "deleteError": "Impossible de supprimer l'itinéraire.",
+    "vibeTitle": "Quelle ambiance recherchez-vous ?",
+    "vibeSubtitle": "Choisissez-en autant que vous voulez — on affinera les destinations pour vous.",
+    "next": "Suivant",
+    "back": "Retour",
+    "destTitle": "Choisissez vos destinations",
+    "destSubtitle": "{{count}} sélectionnée(s)",
+    "detailsTitle": "Presque terminé",
+    "detailsSubtitle": "Donnez un nom et choisissez vos dates.",
+    "quickPick": "Choix rapide",
+    "preset": {
+      "weekend": "Week-end (2 jours)",
+      "week": "1 semaine",
+      "twoWeeks": "2 semaines"
+    },
+    "planNew": "Planifier un voyage",
+    "trip": "Voyage"
   },
   "profile": {
     "hi": "Salut, {{username}}",
@@ -256,7 +272,21 @@
     "guest_house": "Maison d'hôtes",
     "airport": "Aéroport",
     "supermarket": "Supermarché",
-    "market": "Marché"
+    "market": "Marché",
+    "university": "Université",
+    "attraction": "Attraction",
+    "park": "Parc",
+    "gym": "Salle de sport",
+    "library": "Bibliothèque",
+    "courier": "Livraison / Coursier",
+    "car_dealer": "Concessionnaire auto",
+    "electronics": "Électronique",
+    "car_wash": "Lavage auto",
+    "police": "Police",
+    "post_office": "Bureau de poste",
+    "museum": "Musée",
+    "stadium": "Stade",
+    "place_of_worship": "Lieu de culte"
   },
   "feedback": {
     "buttonLabel": "Avis",
