@@ -161,6 +161,23 @@ CATEGORY_TAGS: dict[str, tuple[str, str]] = {
     "airport": ("aeroway", "aerodrome"),
     "supermarket": ("shop", "supermarket"),
     "market": ("amenity", "marketplace"),
+    # Added per request — real OSM tags, same taxonomy as the ones
+    # above (not invented categories, so Overpass actually returns
+    # results for them).
+    "university": ("amenity", "university"),
+    "attraction": ("tourism", "attraction"),
+    "park": ("leisure", "park"),
+    "gym": ("leisure", "fitness_centre"),
+    "library": ("amenity", "library"),
+    "courier": ("office", "courier"),  # closest real OSM tag to "delivery service"
+    "car_dealer": ("shop", "car"),
+    "electronics": ("shop", "electronics"),
+    "car_wash": ("amenity", "car_wash"),
+    "police": ("amenity", "police"),
+    "post_office": ("amenity", "post_office"),
+    "museum": ("tourism", "museum"),
+    "stadium": ("leisure", "stadium"),
+    "place_of_worship": ("amenity", "place_of_worship"),
 }
 
 
