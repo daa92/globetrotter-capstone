@@ -10,7 +10,7 @@ import SearchAutocomplete from "../components/search/SearchAutocomplete";
 import FilterPanel from "../components/search/FilterPanel";
 import { haversineDistanceKm } from "../utils/geo";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 9;
 
 export default function Explore() {
   const { t } = useTranslation();
