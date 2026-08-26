@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ChevronRight, ChevronLeft, Trash2, Calendar, Sparkles, MapPin } from "lucide-react";
+import { Check, ChevronRight, ChevronLeft, Trash2, Calendar, Sparkles, MapPin, Route as RouteIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import AnimatedCanopyBackground from "../components/layout/AnimatedCanopyBackground";
 import DestinationImage from "../components/destinations/DestinationImage";
+import TripRoutePanel from "../components/itineraries/TripRoutePanel";
 import { createItinerary, deleteItinerary, listItineraries, searchDestinations, ApiError } from "../api/client";
 
 const VIBES = [
@@ -127,6 +128,32 @@ function DestinationStep({ destinations, vibes, selected, onToggle, onBack, onNe
   );
 }
 
+// --- Step 3: route + transport -----------------------------------------
+
+function RouteStep({ selectedDestinations, onBack, onNext }) {
+  const { t } = useTranslation();
+  return (
+    <motion.div initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}>
+      <h2 className="font-display text-xl font-semibold mb-1">{t("itineraries.routeTitle", "Your route")}</h2>
+      <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-5">{t("itineraries.routeSubtitle", "See the distance, duration, and how to get there.")}</p>
+
+      <TripRoutePanel destinationIds={selectedDestinations} />
+
+      <div className="mt-6 flex gap-2">
+        <button onClick={onBack} className="inline-flex items-center gap-1 rounded-full bg-neutral-100 dark:bg-neutral-800 px-5 py-2.5 text-sm font-medium">
+          <ChevronLeft size={16} /> {t("itineraries.back", "Back")}
+        </button>
+        <button
+          onClick={onNext}
+          className="inline-flex items-center gap-1.5 rounded-full bg-canopy-500 hover:bg-canopy-700 text-white px-6 py-2.5 text-sm font-semibold"
+        >
+          {t("itineraries.next", "Next")} <ChevronRight size={16} />
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 // --- Step 3: dates + title -------------------------------------------------
 
 function DetailsStep({ title, setTitle, startDate, setStartDate, endDate, setEndDate, suggestedTitle, onBack, onSubmit, creating }) {
@@ -198,41 +225,64 @@ function DetailsStep({ title, setTitle, startDate, setStartDate, endDate, setEnd
 
 function TripCard({ trip, destinations, onDelete }) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
   const cover = destinations.find((d) => d.id === trip.destinations[0]);
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -3 }}
-      className="relative rounded-2xl overflow-hidden shadow-lg h-40"
+      className="rounded-2xl overflow-hidden shadow-lg"
     >
-      {cover ? (
-        <DestinationImage destination={cover} className="absolute inset-0 h-full w-full object-cover" />
-      ) : (
-        <div className="absolute inset-0 bg-canopy-700" />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-      <div className="relative h-full flex flex-col justify-end p-4 text-white">
-        <p className="font-display text-lg font-semibold">{trip.title}</p>
-        <p className="text-xs text-white/80 inline-flex items-center gap-1 mt-0.5">
-          <MapPin size={11} />{t("itineraries.destinationsCount", { count: trip.destinations.length })} · {trip.start_date} → {trip.end_date}
-        </p>
-      </div>
-      <button
-        onClick={() => onDelete(trip.id)}
-        className="absolute top-2 right-2 rounded-full bg-black/50 hover:bg-red-600 text-white p-1.5"
-        aria-label={t("itineraries.delete")}
-      >
-        <Trash2 size={14} />
-      </button>
+      <motion.div whileHover={{ y: -3 }} className="relative h-40">
+        {cover ? (
+          <DestinationImage destination={cover} className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 bg-canopy-700" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        <div className="relative h-full flex flex-col justify-end p-4 text-white">
+          <p className="font-display text-lg font-semibold">{trip.title}</p>
+          <p className="text-xs text-white/80 inline-flex items-center gap-1 mt-0.5">
+            <MapPin size={11} />{t("itineraries.destinationsCount", { count: trip.destinations.length })} · {trip.start_date} → {trip.end_date}
+          </p>
+        </div>
+        <button
+          onClick={() => onDelete(trip.id)}
+          className="absolute top-2 right-2 rounded-full bg-black/50 hover:bg-red-600 text-white p-1.5"
+          aria-label={t("itineraries.delete")}
+        >
+          <Trash2 size={14} />
+        </button>
+        <button
+          onClick={() => setExpanded((x) => !x)}
+          className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/50 hover:bg-canopy-500 text-white px-2.5 py-1 text-xs font-medium"
+        >
+          <RouteIcon size={12} />{expanded ? t("itineraries.hideRoute", "Hide route") : t("itineraries.viewRoute", "View route")}
+        </button>
+      </motion.div>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-white dark:bg-neutral-900 overflow-hidden"
+          >
+            <div className="p-4">
+              <TripRoutePanel destinationIds={trip.destinations} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
 
 // --- Page -------------------------------------------------------------------
 
-const STEPS = ["vibe", "destinations", "details"];
+const STEPS = ["vibe", "destinations", "route", "details"];
 
 export default function Itineraries() {
   const { t } = useTranslation();
@@ -385,6 +435,14 @@ export default function Itineraries() {
                   />
                 )}
                 {step === 2 && (
+                  <RouteStep
+                    key="route"
+                    selectedDestinations={selectedDestinations}
+                    onBack={() => setStep(1)}
+                    onNext={() => setStep(3)}
+                  />
+                )}
+                {step === 3 && (
                   <DetailsStep
                     key="details"
                     title={title}
@@ -394,7 +452,7 @@ export default function Itineraries() {
                     endDate={endDate}
                     setEndDate={setEndDate}
                     suggestedTitle={suggestedTitle}
-                    onBack={() => setStep(1)}
+                    onBack={() => setStep(2)}
                     onSubmit={handleCreate}
                     creating={creating}
                   />
