@@ -130,6 +130,41 @@ def get_route(start_lat: float, start_lng: float, end_lat: float, end_lng: float
     )
 
 
+def _fetch_multi_route(waypoints: list[tuple[float, float]], profile: str) -> dict:
+    """waypoints: ordered list of (lat, lng), 2+ points. Unlike
+    _fetch_route (2 points via GET, distance/duration summary only),
+    this hits ORS's POST /geojson endpoint, which accepts an arbitrary-
+    length coordinate list in one request and returns the actual route
+    geometry (for drawing the line on a map), not just a summary."""
+    resp = httpx.post(
+        f"{settings.OPENROUTESERVICE_BASE_URL}/v2/directions/{profile}/geojson",
+        headers={"Authorization": settings.OPENROUTESERVICE_API_KEY, "Content-Type": "application/json"},
+        json={"coordinates": [[lng, lat] for lat, lng in waypoints]},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    feature = data["features"][0]
+    summary = feature["properties"]["summary"]
+    # GeoJSON is [lng, lat] pairs; flip to [lat, lng] since that's what
+    # every map library (Leaflet included) actually expects.
+    geometry = [[lat, lng] for lng, lat in feature["geometry"]["coordinates"]]
+    return {
+        "distance_km": round(summary["distance"] / 1000, 2),
+        "duration_minutes": round(summary["duration"] / 60, 1),
+        "profile": profile,
+        "geometry": geometry,
+        "method": "driving",
+    }
+
+
+def get_multi_route(waypoints: list[tuple[float, float]], profile: str = "driving-car") -> tuple[dict, bool]:
+    """waypoints order matters for the cache key (a different order is a
+    genuinely different route), which json.dumps(sort_keys=True) still
+    respects since only dict keys get sorted, not list contents."""
+    return get_or_fetch("ors_multi_route", _fetch_multi_route, waypoints=waypoints, profile=profile)
+
+
 # ---------------------------------------------------------------------------
 # Overpass — points of interest (restaurants, hospitals, fuel, etc.)
 #
