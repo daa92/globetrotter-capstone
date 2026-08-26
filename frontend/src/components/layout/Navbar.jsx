@@ -6,6 +6,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { ADMIN_PATH } from "../../constants/adminPath";
 import { unreadNotificationCount } from "../../api/client";
+import UserAvatar from "./UserAvatar";
 
 export default function Navbar() {
   const { t, i18n } = useTranslation();
