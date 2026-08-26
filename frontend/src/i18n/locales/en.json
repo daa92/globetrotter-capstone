@@ -136,7 +136,25 @@
       "twoWeeks": "2 weeks"
     },
     "planNew": "Plan a new trip",
-    "trip": "Trip"
+    "trip": "Trip",
+    "routeTitle": "Your route",
+    "routeSubtitle": "See the distance, duration, and how to get there.",
+    "startingFrom": "Starting from",
+    "yourLocation": "Your location",
+    "locating": "Locating…",
+    "myLocation": "My location",
+    "clearStart": "Clear",
+    "straightLineNote": "Straight-line estimate, not a real road route",
+    "getThere": "How to get there",
+    "website": "Website",
+    "transportDisclaimer": "Coverage shown is a general guide — confirm exact routes and current schedules directly with the operator.",
+    "viewRoute": "View route",
+    "hideRoute": "Hide route",
+    "transportType": {
+      "ride_hailing": "Ride-hailing",
+      "bus": "Bus",
+      "train": "Train"
+    }
   },
   "profile": {
     "hi": "Hi, {{username}}",
