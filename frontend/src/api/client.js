@@ -222,6 +222,7 @@ export const getPlaceSummary = (name, lang) => request("/geo/place-summary", { p
 export const createItinerary = (token, payload) => request("/itineraries", { method: "POST", token, body: payload });
 export const listItineraries = (token) => request("/itineraries", { token });
 export const deleteItinerary = (token, id) => request(`/itineraries/${id}`, { method: "DELETE", token });
+export const previewRoute = (token, payload) => request("/itineraries/route-preview", { method: "POST", token, body: payload });
 
 // ---------------------------------------------------------------------------
 // Earnings / notifications (used by the profile portal, later pass)
