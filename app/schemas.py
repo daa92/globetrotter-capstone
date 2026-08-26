@@ -504,3 +504,39 @@ class CommentOut(BaseModel):
     created_at: str
 
 
+# ---------------------------------------------------------------------------
+# Trip routing (see app/geo_service.py's get_multi_route, app/transport_companies.py)
+# ---------------------------------------------------------------------------
+
+class RouteRequest(BaseModel):
+    destination_ids: list[str] = Field(min_length=1, description="Ordered stops, in visiting order")
+    start_lat: Optional[float] = Field(default=None, description="Trip starting point — your location or a chosen city. Omit to start from the reference city (Douala).")
+    start_lng: Optional[float] = None
+    start_label: Optional[str] = Field(default=None, description="Display label for the start point, e.g. 'Your location' or 'Douala'")
+
+
+class RouteStop(BaseModel):
+    name: str
+    latitude: float
+    longitude: float
+
+
+class TransportSuggestion(BaseModel):
+    name: str
+    type: str  # "ride_hailing" | "bus" | "train"
+    coverage: str
+    best_for: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
+    note: Optional[str] = None
+
+
+class RouteResponse(BaseModel):
+    stops: list[RouteStop]
+    total_distance_km: float
+    total_duration_minutes: Optional[float] = None
+    geometry: list[list[float]] = Field(default_factory=list, description="[[lat, lng], ...] polyline points — empty if only a straight-line fallback was available")
+    method: str  # "driving" | "straight_line"
+    transport_suggestions: list[TransportSuggestion]
+
