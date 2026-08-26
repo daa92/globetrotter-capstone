@@ -128,9 +128,13 @@ export default function Navbar() {
               more than logo + 3 icon buttons on a phone. */}
           {loading ? null : isAuthenticated ? (
             <div className="hidden md:flex items-center gap-3">
-              <Link to="/profile" className="text-sm font-medium text-neutral-700 dark:text-neutral-200 hover:underline">
-                {user?.username}
-              </Link>
+              <Link
+  to="/profile"
+  className="flex items-center gap-2 text-sm font-medium text-neutral-700 dark:text-neutral-200 hover:underline"
+>
+  <UserAvatar user={user} />
+  {user?.username}
+</Link>
               <button
                 onClick={handleLogout}
                 className="rounded-full border border-neutral-300 dark:border-neutral-600 px-4 py-1.5 text-sm font-semibold text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
