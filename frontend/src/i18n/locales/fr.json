@@ -136,7 +136,25 @@
       "twoWeeks": "2 semaines"
     },
     "planNew": "Planifier un voyage",
-    "trip": "Voyage"
+    "trip": "Voyage",
+    "routeTitle": "Votre itinéraire",
+    "routeSubtitle": "Voyez la distance, la durée et comment vous y rendre.",
+    "startingFrom": "Départ de",
+    "yourLocation": "Votre position",
+    "locating": "Localisation…",
+    "myLocation": "Ma position",
+    "clearStart": "Effacer",
+    "straightLineNote": "Estimation à vol d'oiseau, pas un vrai itinéraire routier",
+    "getThere": "Comment s'y rendre",
+    "website": "Site web",
+    "transportDisclaimer": "La couverture indiquée est un guide général — confirmez les itinéraires et horaires exacts directement auprès de l'opérateur.",
+    "viewRoute": "Voir l'itinéraire",
+    "hideRoute": "Masquer l'itinéraire",
+    "transportType": {
+      "ride_hailing": "VTC",
+      "bus": "Bus",
+      "train": "Train"
+    }
   },
   "profile": {
     "hi": "Salut, {{username}}",
