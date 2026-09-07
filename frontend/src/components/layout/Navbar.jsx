@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Moon, Sun, ShieldCheck, Menu, X, Bell } from "lucide-react";
+import { Moon, Sun, ShieldCheck, Menu, X, Bell, MessageCircle } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import { ADMIN_PATH } from "../../constants/adminPath";
-import { unreadNotificationCount } from "../../api/client";
+import { unreadNotificationCount, listConversations } from "../../api/client";
 import UserAvatar from "./UserAvatar";
 
 export default function Navbar() {
@@ -15,6 +15,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [chatUnread, setChatUnread] = useState(0);
 
   const handleLogout = async () => {
     await logout();
@@ -36,6 +37,28 @@ export default function Navbar() {
     const load = () => {
       unreadNotificationCount(accessToken)
         .then((r) => !cancelled && setUnread(r.unread_count))
+        .catch(() => {});
+    };
+    load();
+    const interval = setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isAuthenticated, accessToken]);
+
+  // Same idea for chat: the badge here is a lightweight poll (the Chat
+  // page itself gets instant updates over the websocket — this is just
+  // so the badge is right before you've ever opened /chat).
+  useEffect(() => {
+    if (!isAuthenticated || !accessToken) {
+      setChatUnread(0);
+      return;
+    }
+    let cancelled = false;
+    const load = () => {
+      listConversations(accessToken)
+        .then((convs) => !cancelled && setChatUnread(convs.reduce((sum, c) => sum + (c.unread_count || 0), 0)))
         .catch(() => {});
     };
     load();
@@ -110,6 +133,22 @@ export default function Navbar() {
 
           {!loading && isAuthenticated && (
             <Link
+              to="/chat"
+              className="relative rounded-full p-2 border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+              aria-label="Chat"
+              onClick={() => setMenuOpen(false)}
+            >
+              <MessageCircle size={16} />
+              {chatUnread > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-teal-700 px-1 text-[10px] font-bold leading-none text-white">
+                  {chatUnread > 9 ? "9+" : chatUnread}
+                </span>
+              )}
+            </Link>
+          )}
+
+          {!loading && isAuthenticated && (
+            <Link
               to="/profile?tab=Notifications"
               className="relative rounded-full p-2 border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
               aria-label="Notifications"
@@ -176,7 +215,12 @@ export default function Navbar() {
             </button>
             {loading ? null : isAuthenticated ? (
               <div className="flex items-center gap-3">
-                <Link to="/profile" onClick={() => setMenuOpen(false)} className="text-sm font-medium hover:underline">
+                <Link
+                  to="/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 text-sm font-medium hover:underline"
+                >
+                  <UserAvatar user={user} />
                   {user?.username}
                 </Link>
                 <button
