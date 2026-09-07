@@ -36,6 +36,8 @@ AUDIT_LOG_FILE = "audit_log"
 GEO_CACHE_FILE = "geo_cache"
 DESTINATION_VOTES_FILE = "destination_votes"
 DESTINATION_COMMENTS_FILE = "destination_comments"
+CHAT_CONVERSATIONS_FILE = "chat_conversations"
+CHAT_MESSAGES_FILE = "chat_messages"
 
 # A process-local lock still guards read-modify-write sequences, matching
 # the old file-based version's documented limitation (see its original
