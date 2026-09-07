@@ -505,6 +505,79 @@ class CommentOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Chat (direct messages + groups — text and multimedia, WhatsApp-style)
+# ---------------------------------------------------------------------------
+
+class ChatUserOut(BaseModel):
+    """Minimal public profile used for the "start a chat" search — never
+    leaks email/phone/admin fields, unlike UserPublic."""
+    username: str
+    profile_picture_url: Optional[str] = None
+
+
+class ChatMemberOut(BaseModel):
+    username: str
+    role: str  # "admin" | "member"
+    profile_picture_url: Optional[str] = None
+    joined_at: str
+
+
+class ChatMessageOut(BaseModel):
+    id: str
+    conversation_id: str
+    sender: str
+    type: str  # "text" | "image" | "video" | "audio" | "file"
+    text: Optional[str] = None
+    media_url: Optional[str] = None
+    media_type: Optional[str] = None
+    file_name: Optional[str] = None
+    created_at: str
+    edited_at: Optional[str] = None
+    deleted: bool = False
+    read_by: list[str] = Field(default_factory=list, description="Other members who have read this message")
+
+
+class ChatConversationOut(BaseModel):
+    id: str
+    type: str  # "direct" | "group"
+    name: Optional[str] = None
+    picture_url: Optional[str] = None
+    created_by: str
+    created_at: str
+    updated_at: str
+    members: list[ChatMemberOut]
+    last_message: Optional[ChatMessageOut] = None
+    unread_count: int = 0
+
+
+class ChatConversationCreate(BaseModel):
+    type: str = Field(pattern=r"^(direct|group)$")
+    member_usernames: list[str] = Field(min_length=1, description="For 'direct', exactly one other username. For 'group', one or more.")
+    name: Optional[str] = Field(default=None, max_length=100, description="Required for 'group'")
+
+
+class ChatConversationUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=100)
+    picture_url: Optional[str] = None
+
+
+class ChatMembersAdd(BaseModel):
+    usernames: list[str] = Field(min_length=1)
+
+
+class ChatMemberRoleUpdate(BaseModel):
+    role: str = Field(pattern=r"^(admin|member)$")
+
+
+class ChatMessageCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class ChatMessageEdit(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
+# ---------------------------------------------------------------------------
 # Trip routing (see app/geo_service.py's get_multi_route, app/transport_companies.py)
 # ---------------------------------------------------------------------------
 
@@ -539,4 +612,3 @@ class RouteResponse(BaseModel):
     geometry: list[list[float]] = Field(default_factory=list, description="[[lat, lng], ...] polyline points — empty if only a straight-line fallback was available")
     method: str  # "driving" | "straight_line"
     transport_suggestions: list[TransportSuggestion]
-
