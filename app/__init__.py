@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.cleanup import run_cleanup_loop
 from app.config import settings
 from app.db import init_db
-from app.routers import auth, admin_users, admin_overview, destinations, earnings, feedback, geo, itineraries, notifications, places, recommendations, users
+from app.routers import auth, admin_users, admin_overview, chat, destinations, earnings, feedback, geo, itineraries, notifications, places, recommendations, users
 
 logger = logging.getLogger("gt.app")
 
@@ -64,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(earnings.router)
     app.include_router(notifications.router)
     app.include_router(geo.router)
+    app.include_router(chat.router)
 
     if settings.SIMULATION_MODE:
         from app.routers import debug_challenges
