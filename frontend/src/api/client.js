@@ -157,6 +157,87 @@ export async function uploadProfilePicture(token, file) {
 }
 
 // ---------------------------------------------------------------------------
+// Chat — direct messages + groups (text and multimedia)
+// ---------------------------------------------------------------------------
+
+export const searchChatUsers = (token, q) => request("/chat/users/search", { token, params: { q } });
+
+export const listConversations = (token) => request("/chat/conversations", { token });
+export const getConversation = (token, id) => request(`/chat/conversations/${id}`, { token });
+
+export const createDirectConversation = (token, username) =>
+  request("/chat/conversations", { method: "POST", token, body: { type: "direct", member_usernames: [username] } });
+
+export const createGroupConversation = (token, name, member_usernames) =>
+  request("/chat/conversations", { method: "POST", token, body: { type: "group", name, member_usernames } });
+
+export const updateConversation = (token, id, payload) =>
+  request(`/chat/conversations/${id}`, { method: "PATCH", token, body: payload });
+
+export const deleteConversation = (token, id) => request(`/chat/conversations/${id}`, { method: "DELETE", token });
+
+export const addConversationMembers = (token, id, usernames) =>
+  request(`/chat/conversations/${id}/members`, { method: "POST", token, body: { usernames } });
+
+export const removeConversationMember = (token, id, username) =>
+  request(`/chat/conversations/${id}/members/${encodeURIComponent(username)}`, { method: "DELETE", token });
+
+export const setConversationMemberRole = (token, id, username, role) =>
+  request(`/chat/conversations/${id}/members/${encodeURIComponent(username)}`, { method: "PATCH", token, body: { role } });
+
+export const listMessages = (token, conversationId, { limit, before } = {}) =>
+  request(`/chat/conversations/${conversationId}/messages`, { token, params: { limit, before } });
+
+export const sendMessage = (token, conversationId, text) =>
+  request(`/chat/conversations/${conversationId}/messages`, { method: "POST", token, body: { text } });
+
+export const editMessage = (token, messageId, text) =>
+  request(`/chat/messages/${messageId}`, { method: "PATCH", token, body: { text } });
+
+export const deleteMessage = (token, messageId) => request(`/chat/messages/${messageId}`, { method: "DELETE", token });
+
+export const markConversationRead = (token, conversationId) =>
+  request(`/chat/conversations/${conversationId}/read`, { method: "POST", token });
+
+export async function sendMediaMessage(token, conversationId, file, caption) {
+  const url = new URL(`/chat/conversations/${conversationId}/messages/media`, API_URL);
+  const formData = new FormData();
+  formData.append("file", file);
+  if (caption) formData.append("caption", caption);
+
+  const resp = await fetch(url.toString(), {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    credentials: "include",
+  });
+  return parseResponseOrThrow(resp);
+}
+
+export async function uploadGroupPicture(token, conversationId, file) {
+  const url = new URL(`/chat/conversations/${conversationId}/picture`, API_URL);
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const resp = await fetch(url.toString(), {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    credentials: "include",
+  });
+  return parseResponseOrThrow(resp);
+}
+
+/** WebSocket URL for live chat push (new/edited/deleted messages, group
+ * updates, typing, read receipts). Kept here alongside the rest of the
+ * chat API surface even though it's not a plain fetch() call. */
+export function chatWebSocketUrl(token) {
+  const httpUrl = new URL("/chat/ws", API_URL);
+  const wsProtocol = httpUrl.protocol === "https:" ? "wss:" : "ws:";
+  return `${wsProtocol}//${httpUrl.host}${httpUrl.pathname}?token=${encodeURIComponent(token)}`;
+}
+
+// ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 
