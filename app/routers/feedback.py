@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends
 from app import storage
 from app.dependencies import get_current_user, require_permission
 from app.notifications import outbox
+from app.notifications import email_templates
 from app.schemas import FeedbackCreate
 
 logger = logging.getLogger("gt.feedback")
@@ -31,13 +32,8 @@ def _notify_admins(entry: dict) -> None:
     if not admins:
         return
 
-    rating_line = f"<p>Rating: {entry['rating']}/5</p>" if entry.get("rating") else ""
-    body = (
-        f"<p>New feedback from <strong>{entry['username']}</strong> "
-        f"({entry['category']}):</p>"
-        f"<p>{entry['message']}</p>"
-        f"{rating_line}"
-        f"<p><a href=\"https://gtcam.vercel.app/admin-c746b9c7d7c57420\">View in dashboard</a></p>"
+    body = email_templates.admin_feedback_email(
+        entry["username"], entry["category"], entry["message"], entry.get("rating")
     )
     for admin in admins:
         try:
