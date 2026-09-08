@@ -20,6 +20,9 @@
   "footer": {
     "rights": "All rights reserved."
   },
+  "whatsapp": {
+    "follow": "Follow our WhatsApp channel"
+  },
   "auth": {
     "username": "Username",
     "email": "Email",
@@ -304,7 +307,30 @@
     "post_office": "Post Office",
     "museum": "Museum",
     "stadium": "Stadium",
-    "place_of_worship": "Place of Worship"
+    "place_of_worship": "Place of Worship",
+    "clinic": "Clinic",
+    "dentist": "Dentist",
+    "veterinary": "Veterinary clinic",
+    "fire_station": "Fire station",
+    "townhall": "Town hall",
+    "courthouse": "Courthouse",
+    "embassy": "Embassy",
+    "kindergarten": "Kindergarten",
+    "driving_school": "Driving school",
+    "bakery": "Bakery",
+    "butcher": "Butcher",
+    "hairdresser": "Hairdresser",
+    "laundry": "Laundry",
+    "tailor": "Tailor",
+    "car_repair": "Car repair / Garage",
+    "hardware_store": "Hardware store",
+    "bookshop": "Bookshop",
+    "stationery": "Stationery shop",
+    "clothes_shop": "Clothing shop",
+    "bus_station": "Bus station",
+    "taxi": "Taxi stand",
+    "bureau_de_change": "Bureau de change",
+    "internet_cafe": "Internet cafe"
   },
   "feedback": {
     "buttonLabel": "Feedback",
