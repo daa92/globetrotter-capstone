@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app import audit, storage
 from app.dependencies import get_current_user, require_permission
 from app.notifications import outbox
+from app.notifications import email_templates
 from app.notifications.service import create_for_many
 from app.schemas import AdminSendNotificationRequest, NotificationBatchAction, NotificationBatchOut, NotificationOut
 
@@ -109,9 +110,10 @@ def admin_send_notification(payload: AdminSendNotificationRequest, admin: dict =
 
     emailed = 0
     if payload.also_email:
+        email_body = email_templates.broadcast_email(payload.title, payload.message)
         for u in targets:
             if u.get("email"):
-                outbox.send(to=u["email"], subject=payload.title, body=payload.message)
+                outbox.send(to=u["email"], subject=payload.title, body=email_body)
                 emailed += 1
 
     audience = "broadcast" if payload.broadcast else ("unicast" if len(usernames) == 1 else "multicast")
