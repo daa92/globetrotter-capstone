@@ -213,6 +213,32 @@ CATEGORY_TAGS: dict[str, tuple[str, str]] = {
     "museum": ("tourism", "museum"),
     "stadium": ("leisure", "stadium"),
     "place_of_worship": ("amenity", "place_of_worship"),
+    # Everyday-life categories relevant to Cameroon specifically — same
+    # rule as above: only real OSM tags, so Overpass actually returns
+    # something instead of silently coming back empty.
+    "clinic": ("amenity", "clinic"),
+    "dentist": ("amenity", "dentist"),
+    "veterinary": ("amenity", "veterinary"),
+    "fire_station": ("amenity", "fire_station"),
+    "townhall": ("amenity", "townhall"),
+    "courthouse": ("amenity", "courthouse"),
+    "embassy": ("office", "diplomatic"),
+    "kindergarten": ("amenity", "kindergarten"),
+    "driving_school": ("amenity", "driving_school"),
+    "bakery": ("shop", "bakery"),
+    "butcher": ("shop", "butcher"),
+    "hairdresser": ("shop", "hairdresser"),
+    "laundry": ("shop", "laundry"),
+    "tailor": ("shop", "tailor"),
+    "car_repair": ("shop", "car_repair"),
+    "hardware_store": ("shop", "hardware"),
+    "bookshop": ("shop", "books"),
+    "stationery": ("shop", "stationery"),
+    "clothes_shop": ("shop", "clothes"),
+    "bus_station": ("amenity", "bus_station"),
+    "taxi": ("amenity", "taxi"),
+    "bureau_de_change": ("amenity", "bureau_de_change"),
+    "internet_cafe": ("amenity", "internet_cafe"),
 }
 
 
