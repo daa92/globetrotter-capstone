@@ -109,7 +109,7 @@ def render_email(
             <tr>
               <td style="padding:18px 32px;background:{BG};border-top:1px solid {BORDER};">
                 <p style="margin:0;font-size:12px;color:{MUTED};">
-                  GT — GlobeTrotter Cameroon &middot; Discover Cameroon, your way.
+                  GTCam; Discover Cameroon, your way.
                 </p>
               </td>
             </tr>
@@ -128,7 +128,7 @@ def render_email(
 def verification_email(username: str, token: str, ttl_minutes: int) -> str:
     link = f"{settings.FRONTEND_URL}/verify?token={token}"
     body_html = (
-        f'<p style="margin:0 0 6px;">Welcome to GT, <strong>{username}</strong> 👋</p>'
+        f'<p style="margin:0 0 6px;">Welcome to GTCam, <strong>{username}</strong> 👋</p>'
         f'<p style="margin:0;">Confirm your email to activate your account — this link '
         f"and the code below both expire in {ttl_minutes} minutes.</p>"
         f"{code_line(token)}"
@@ -136,7 +136,7 @@ def verification_email(username: str, token: str, ttl_minutes: int) -> str:
         f"Still on the sign-up screen? Paste the code above there instead of clicking the button.</p>"
     )
     return render_email(
-        preheader=f"Verify your GT account, {username}",
+        preheader=f"Verify your GTCam account, {username}",
         heading="Confirm your email",
         body_html=body_html,
         cta_label="Verify my account",
@@ -157,7 +157,7 @@ def password_reset_email(username: str, token: str, ttl_minutes: int) -> str:
         f"{code_line(token)}"
     )
     return render_email(
-        preheader="Reset your GT password",
+        preheader="Reset your GTCam password",
         heading="Reset your password",
         body_html=body_html,
         cta_label="Reset my password",
