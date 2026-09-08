@@ -29,6 +29,7 @@ from app.config import settings
 from app.dependencies import get_current_user
 from app.google_oauth import verify_google_id_token
 from app.notifications import outbox
+from app.notifications import email_templates
 from app.notifications.service import create_notification
 from app.schemas import (
     AdminBootstrapRequest,
@@ -87,19 +88,13 @@ def _verification_email_html(username: str, token: str) -> str:
       2. Copy the code shown below into the in-app "enter your code"
          screen you land on right after registering.
 
-    NOTE: keep the literal "token: {token}\\n" line intact — the test
-    suite extracts tokens from outbox messages via
-    body.split("token: ")[1].split("\\n")[0]; this has to stay exact.
+    NOTE: the rendered HTML (app/notifications/email_templates.py)
+    keeps a literal "token: {token}\\n" text node — the test suite
+    extracts tokens from outbox messages via
+    body.split("token: ")[1].split("\\n")[0]; that substring has to
+    stay exact even as the surrounding design changes.
     """
-    link = f"{settings.FRONTEND_URL}/verify?token={token}"
-    return (
-        f"<p>Welcome to GlobeTrotter, {username}!</p>\n"
-        f"token: {token}\n"
-        f"<p>Verify your account within {settings.UNVERIFIED_ACCOUNT_TTL_MINUTES} minutes "
-        f'by clicking here: <a href="{link}">{link}</a></p>\n'
-        f"<p>Or, if you're still on the sign-up screen, enter the code above.</p>\n"
-        f"<p>If you didn't create this account, you can ignore this email.</p>"
-    )
+    return email_templates.verification_email(username, token, settings.UNVERIFIED_ACCOUNT_TTL_MINUTES)
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -378,7 +373,10 @@ def request_password_reset(payload: PasswordResetRequest):
     if user.get("phone"):
         outbox.send(to=user["phone"], channel="sms", subject="Reset your GT password", body=body)
     elif user.get("email"):
-        outbox.send(to=user["email"], channel="email", subject="Reset your GT password", body=body)
+        email_body = email_templates.password_reset_email(
+            user["username"], reset_token, settings.PASSWORD_RESET_TOKEN_TTL_MINUTES
+        )
+        outbox.send(to=user["email"], channel="email", subject="Reset your GT password", body=email_body)
     # A user with neither on file (shouldn't happen given registration
     # requires one or the other) simply can't be reached — the generic
     # response is still returned either way, so this never leaks that detail.
