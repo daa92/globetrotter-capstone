@@ -23,7 +23,7 @@ export function messagePreview(message) {
   if (!message) return "No messages yet";
   if (message.deleted) return "Message deleted";
   if (message.type === "text") return message.text || "";
-  const labels = { image: "📷 Photo", video: "🎬 Video", audio: "🎵 Audio", file: "📎 File" };
+  const labels = { image: "Photo", video: "Video", audio: "Audio", file: "File" };
   const label = labels[message.type] || "Attachment";
   return message.text ? `${label} · ${message.text}` : label;
 }
