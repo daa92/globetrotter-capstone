@@ -132,7 +132,7 @@ def register(payload: UserRegister):
 
     outbox.send(
         to=payload.email,
-        subject="Verify your GT account",
+        subject="Verify your GTCam account",
         body=_verification_email_html(payload.username, verification_token),
     )
 
@@ -181,9 +181,9 @@ def register_phone(payload: PhoneRegister):
     outbox.send(
         to=payload.phone,
         channel="sms",
-        subject="Verify your GT account",
+        subject="Verify your GTCam account",
         body=(
-            f"Welcome to GT! Verify your account within "
+            f"Welcome to GTCam! Verify your account within "
             f"{settings.UNVERIFIED_ACCOUNT_TTL_MINUTES} minutes using this code: "
             f"{verification_token}"
         ),
@@ -222,10 +222,10 @@ def verify_account(payload: VerifyRequest):
         create_notification(
             username=user["referred_by"],
             title="You earned a referral bonus!",
-            message=f"{user['username']} just verified their account using your referral link — you earned ${settings.REFERRAL_BONUS_USD}.",
+            message=f"{user['username']} just verified their account using your referral link, you earned ${settings.REFERRAL_BONUS_USD}.",
             category="referral",
         )
-    return {"detail": "Account verified — you can now log in."}
+    return {"detail": "Account verified, you can now log in."}
 
 
 def _authenticate(username: str, password: str) -> dict:
@@ -371,12 +371,12 @@ def request_password_reset(payload: PasswordResetRequest):
         f"{settings.PASSWORD_RESET_TOKEN_TTL_MINUTES} minutes: {reset_token}"
     )
     if user.get("phone"):
-        outbox.send(to=user["phone"], channel="sms", subject="Reset your GT password", body=body)
+        outbox.send(to=user["phone"], channel="sms", subject="Reset your GTCam password", body=body)
     elif user.get("email"):
         email_body = email_templates.password_reset_email(
             user["username"], reset_token, settings.PASSWORD_RESET_TOKEN_TTL_MINUTES
         )
-        outbox.send(to=user["email"], channel="email", subject="Reset your GT password", body=email_body)
+        outbox.send(to=user["email"], channel="email", subject="Reset your GTCam password", body=email_body)
     # A user with neither on file (shouldn't happen given registration
     # requires one or the other) simply can't be reached — the generic
     # response is still returned either way, so this never leaks that detail.
@@ -393,7 +393,7 @@ def confirm_password_reset(payload: PasswordResetConfirm):
 
     expires_at = user.get("password_reset_expires_at")
     if not expires_at or datetime.now(timezone.utc) > datetime.fromisoformat(expires_at):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This reset code has expired — request a new one")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This reset code has expired and consequently, request a new one")
 
     storage.update_one(
         storage.USERS_FILE, "username", user["username"],
@@ -406,10 +406,10 @@ def confirm_password_reset(payload: PasswordResetConfirm):
     create_notification(
         username=user["username"],
         title="Your password was changed",
-        message="Your GT password was just reset. If this wasn't you, contact support immediately.",
+        message="Your GTCam password was just reset. If this wasn't you, contact support immediately.",
         category="security",
     )
-    return {"detail": "Password updated — you can now log in with your new password."}
+    return {"detail": "Password updated; you can now log in with your new password."}
 
 
 def _generate_username_from_email(email: str, existing_users: list[dict]) -> str:
